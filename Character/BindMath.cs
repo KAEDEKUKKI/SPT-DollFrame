@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace GF2
+namespace DollFrame
 {
     /// <summary>
     /// Pure bind-pose math on System.Numerics only (no UnityEngine, parser/build

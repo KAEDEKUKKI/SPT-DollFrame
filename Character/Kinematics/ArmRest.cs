@@ -9,11 +9,11 @@
 // X 側符按 attach 肘位定側）經上半身2 attach 世界旋轉的反變換入 chest 局部；每幀由
 // TwoBoneIkMath.Solve 經 chestRotNow 升回世界。胸腔 SDF 半徑 Build 期收緊：
 // clamp(0.6×|chest→上臂 attach 距|＋0.02, 0.09, 0.18)，缺量測回退 0.13。
-#if !GF2_PMX_PARSER_ONLY
+#if !DOLLFRAME_PMX_PARSER_ONLY
 using System;
 using Snx = System.Numerics;
 
-namespace GF2
+namespace DollFrame
 {
     /// <summary>
     /// 單側臂鏈 Build 校準結果（M1）：純數學鏈（Chain，權威 Kinematics/TwoBoneIk）＋

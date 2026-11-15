@@ -1,7 +1,7 @@
 using EFT;
 using HarmonyLib;
 
-namespace GF2
+namespace DollFrame
 {
     /// <summary>Player visibility guard for the body-replacement route.</summary>
     internal static class Patches
@@ -47,7 +47,7 @@ namespace GF2
         /// 藏身處 FP 身體動畫機復活（2026-11-14-10，層 1 狀態治理；TelemetryRegistry
         /// 'hideout body animator:' 單一生產者）：原版 HideoutPlayerOwner.SetPointOfView 在
         /// FirstPersonMode 時把 BodyAnimatorCommon 整個停用（省效能；原版玩家在 FP 看不到
-        /// 自己的 TP 身體故無人察覺骨骼凍結），被 GF2 替換後 FreeCam／影子仍讀取該 TP 骨架，
+        /// 自己的 TP 身體故無人察覺骨骼凍結），被 DollFrame 替換後 FreeCam／影子仍讀取該 TP 骨架，
         /// 凍結骨架會被 rig 忠實鏡射成卡死姿勢。恢復 enabled=true 讓空手待機持續播放、
         /// rig 鏡射自然跟擺；無 BodyReplacer（未替換）者完全維持遊戲原生行為。
         /// </summary>
@@ -66,7 +66,7 @@ namespace GF2
                 if (body != null && !body.enabled)
                 {
                     body.enabled = true;
-                    Plugin.Log.LogInfo("[GF2] hideout body animator: re-enabled (replaced TP body keeps idle source alive)");
+                    Plugin.Log.LogInfo("[DollFrame] hideout body animator: re-enabled (replaced TP body keeps idle source alive)");
                 }
             }
             catch (System.Exception e)

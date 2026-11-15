@@ -4,11 +4,11 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using UnityEngine;
-#if !GF2_PMX_PARSER_ONLY
+#if !DOLLFRAME_PMX_PARSER_ONLY
 using UnityEngine.Rendering;
 #endif
 
-namespace GF2
+namespace DollFrame
 {
     /// <summary>
     /// Runtime PMX 2.0 parser + Unity asset builder for the GFL2 character import.
@@ -190,7 +190,7 @@ namespace GF2
                 m.MaterialTris[i] = tris;
             }
             if (faceCursor != nfaceIndices)
-                Plugin.Log.LogWarning($"[GF2] pmx face count mismatch: materials sum {faceCursor} vs indices {nfaceIndices}");
+                Plugin.Log.LogWarning($"[DollFrame] pmx face count mismatch: materials sum {faceCursor} vs indices {nfaceIndices}");
             // ---- bones ----
             // Two exporters are in circulation for these models. The GFL2 variant packs
             // [u16 parent | u8 layer | u8 pad] into a 4-byte int, skips 2 extra bytes and
@@ -209,10 +209,10 @@ namespace GF2
             }
             catch (Exception e) when (e is InvalidDataException or EndOfStreamException || e is ArgumentOutOfRangeException)
             {
-                Plugin.Log.LogInfo($"[GF2] GFL bone layout attempt failed: {e.Message}");
+                Plugin.Log.LogInfo($"[DollFrame] GFL bone layout attempt failed: {e.Message}");
                 _f.BaseStream.Position = boneSectionStart;
                 m.Bones = ReadBonesSpec(nb);
-                Plugin.Log.LogInfo($"[GF2] pmx uses the stock PMX bone layout ({m.Bones.Length} bones)");
+                Plugin.Log.LogInfo($"[DollFrame] pmx uses the stock PMX bone layout ({m.Bones.Length} bones)");
             }
             // clamp out-of-range / negative vertex weight indices now that the bone count is known
             for (int i = 0; i < m.Weights.Length; i++)
@@ -421,10 +421,7 @@ namespace GF2
     }
 
     /// <summary>
-    /// .gfc character package (self-contained: PMX binary + all referenced textures).
-    /// Layout v1: "GFCP" | u32 version | u32+utf8 display name | u32+utf8 pmx filename |
-    /// u32+bytes PMX | u32 texCount | { u32+utf8 authored texture path | u32+bytes PNG }.
-    /// Pure IO, no Unity types: one reader shared verbatim by the plugin and the packager.
+    /// Character package loaded from a directory (PMX binary + all referenced textures).
     /// </summary>
     internal sealed class PmxContainerData
     {
@@ -436,42 +433,91 @@ namespace GF2
 
     internal static class PmxContainer
     {
-        internal const string Magic = "GFCP";
-        internal const uint FormatVersion = 1;
-
-        internal static PmxContainerData Read(Stream input)
+        /// <summary>Find the primary .pmx file inside a character folder (top-level first, then recursive).</summary>
+        internal static string FindPmxInDirectory(string dirPath)
         {
-            var f = new BinaryReader(input);
-            if (Encoding.ASCII.GetString(f.ReadBytes(4)) != Magic)
-                throw new InvalidDataException($"not a {Magic} character package");
-            uint ver = f.ReadUInt32();
-            if (ver != FormatVersion)
-                throw new InvalidDataException($"package format {ver}, supported is {FormatVersion}");
-            var d = new PmxContainerData
+            if (string.IsNullOrEmpty(dirPath) || !Directory.Exists(dirPath)) return null;
+            var top = Directory.GetFiles(dirPath, "*.pmx", SearchOption.TopDirectoryOnly);
+            if (top.Length > 0)
             {
-                Name = Encoding.UTF8.GetString(f.ReadBytes(f.ReadInt32())),
-                PmxFilename = Encoding.UTF8.GetString(f.ReadBytes(f.ReadInt32())),
-                Textures = new Dictionary<string, byte[]>(StringComparer.Ordinal)
-            };
-            d.Pmx = f.ReadBytes(f.ReadInt32());
-            int n = f.ReadInt32();
-            for (int i = 0; i < n; i++)
-                d.Textures[Encoding.UTF8.GetString(f.ReadBytes(f.ReadInt32()))] = f.ReadBytes(f.ReadInt32());
-            return d;
+                Array.Sort(top, StringComparer.Ordinal);
+                return top[0];
+            }
+            var all = Directory.GetFiles(dirPath, "*.pmx", SearchOption.AllDirectories);
+            if (all.Length > 0)
+            {
+                Array.Sort(all, StringComparer.Ordinal);
+                return all[0];
+            }
+            return null;
         }
 
-        /// <summary>
-        /// 只讀 magic + 版本 + 顯示名稱（cache 鍵），payload 全部略過。warm 命中時呼叫端
-        /// 不需要把數十 MB 的容器讀進記憶體；壞 magic 與 Read 同樣拋 InvalidDataException。
-        /// 版本不在此驗證：warm 命中代表先前已由 Read 驗證過；cold 命中會走 Read 補驗。
-        /// </summary>
-        internal static string ReadName(Stream input)
+        /// <summary>Enumerate character folders containing a .pmx file under rootDir.</summary>
+        internal static string[] EnumeratePackages(string rootDir)
         {
-            var f = new BinaryReader(input);
-            if (Encoding.ASCII.GetString(f.ReadBytes(4)) != Magic)
-                throw new InvalidDataException($"not a {Magic} character package");
-            f.ReadUInt32();
-            return Encoding.UTF8.GetString(f.ReadBytes(f.ReadInt32()));
+            if (string.IsNullOrEmpty(rootDir) || !Directory.Exists(rootDir))
+                return Array.Empty<string>();
+            var list = new List<string>();
+            foreach (var sub in Directory.GetDirectories(rootDir))
+            {
+                if (FindPmxInDirectory(sub) != null)
+                    list.Add(sub);
+            }
+            list.Sort((a, b) => string.Compare(Path.GetFileName(a), Path.GetFileName(b), StringComparison.Ordinal));
+            return list.ToArray();
+        }
+
+        /// <summary>Read raw PMX bytes from a character directory.</summary>
+        internal static byte[] ReadPmxBytes(string dirPath)
+        {
+            var pmxFile = FindPmxInDirectory(dirPath);
+            if (pmxFile == null)
+                throw new FileNotFoundException($"no .pmx file found in '{dirPath}'");
+            return File.ReadAllBytes(pmxFile);
+        }
+
+        /// <summary>Read a character directory (PMX + textures) into PmxContainerData.</summary>
+        internal static PmxContainerData ReadDirectory(string dirPath)
+        {
+            var pmxFile = FindPmxInDirectory(dirPath);
+            if (pmxFile == null)
+                throw new FileNotFoundException($"no .pmx file found in '{dirPath}'");
+            var pmxDir = Path.GetDirectoryName(pmxFile) ?? dirPath;
+            var textures = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+            foreach (var file in Directory.GetFiles(dirPath, "*.*", SearchOption.AllDirectories))
+            {
+                var ext = Path.GetExtension(file);
+                if (!ext.Equals(".png", StringComparison.OrdinalIgnoreCase) &&
+                    !ext.Equals(".jpg", StringComparison.OrdinalIgnoreCase) &&
+                    !ext.Equals(".jpeg", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                var bytes = File.ReadAllBytes(file);
+                var relPmx = MakeRelativePath(pmxDir, file);
+                textures[relPmx] = bytes;
+                var relBack = relPmx.Replace('/', '\\');
+                if (!textures.ContainsKey(relBack)) textures[relBack] = bytes;
+                var relRoot = MakeRelativePath(dirPath, file);
+                if (!textures.ContainsKey(relRoot)) textures[relRoot] = bytes;
+                var baseName = Path.GetFileName(file);
+                if (!textures.ContainsKey(baseName)) textures[baseName] = bytes;
+            }
+            return new PmxContainerData
+            {
+                Name = Path.GetFileName(dirPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)),
+                PmxFilename = Path.GetFileName(pmxFile),
+                Pmx = File.ReadAllBytes(pmxFile),
+                Textures = textures
+            };
+        }
+
+        private static string MakeRelativePath(string rootDir, string filePath)
+        {
+            var root = Path.GetFullPath(rootDir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            var full = Path.GetFullPath(filePath);
+            var rel = full.StartsWith(root, StringComparison.OrdinalIgnoreCase)
+                ? full.Substring(root.Length)
+                : Path.GetFileName(full);
+            return rel.Replace('\\', '/');
         }
     }
 
@@ -532,7 +578,7 @@ namespace GF2
         }
     }
 
-#if !GF2_PMX_PARSER_ONLY
+#if !DOLLFRAME_PMX_PARSER_ONLY
     /// <summary>
     /// Cached Unity assets for one PMX file: mesh + materials (Standard) + parsed model.
     /// Built once, shared by every player using the model. The mesh is skinned against a
@@ -593,7 +639,7 @@ namespace GF2
         {
             if (!Cache.ContainsKey(key))
             {
-                Plugin.Log.LogWarning($"[GF2] cache: acquire on non-cached key '{key}'");
+                Plugin.Log.LogWarning($"[DollFrame] cache: acquire on non-cached key '{key}'");
                 return;
             }
             Policy.Acquire(key);
@@ -626,28 +672,21 @@ namespace GF2
         internal static PmxAssets LoadOrAcquire(string pkgPath, int maxTexSize, bool flipUv,
             string[] accessoryPatterns, out string pkgName, out bool warm, out double elapsedMs)
         {
-            PmxContainerData pkg = null;
-            using (var fs = File.OpenRead(pkgPath))
+            pkgName = Path.GetFileName(pkgPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            if (!Directory.Exists(pkgPath))
             {
-                pkgName = PmxContainer.ReadName(fs);
-                warm = IsCached(pkgName);
-                if (!warm)
-                {
-                    fs.Position = 0;
-                    pkg = PmxContainer.Read(fs);
-                }
+                warm = false;
+                elapsedMs = 0;
+                return null;
             }
+            warm = IsCached(pkgName);
             var sw = System.Diagnostics.Stopwatch.StartNew();
             var assets = warm ? AcquireIfCached(pkgName) : null;
             if (assets == null)
             {
                 warm = false;
-                if (pkg == null)
-                {
-                    using (var fs = File.OpenRead(pkgPath))
-                        pkg = PmxContainer.Read(fs);
-                }
-                assets = Get(pkgName, pkg.Pmx, pkg.Textures, maxTexSize, flipUv, accessoryPatterns);
+                var pkg = PmxContainer.ReadDirectory(pkgPath);
+                assets = Get(pkgName, pkg.Pmx, pkg.Textures, maxTexSize, flipUv, accessoryPatterns, pkgPath);
             }
             sw.Stop();
             elapsedMs = sw.Elapsed.TotalMilliseconds;
@@ -659,7 +698,7 @@ namespace GF2
             if (Policy.RefCount(key) <= 0) return;
             var victims = Policy.Release(key);
             if (Policy.RefCount(key) == 0)
-                Plugin.Log.LogInfo($"[GF2] cache: idle {key} (kept {Policy.IdleCount})");
+                Plugin.Log.LogInfo($"[DollFrame] cache: idle {key} (kept {Policy.IdleCount})");
             foreach (var v in victims) EvictEntry(v);
         }
 
@@ -675,7 +714,7 @@ namespace GF2
             if (a.Textures != null)
                 foreach (var t in a.Textures)
                     if (t != null) UnityEngine.Object.Destroy(t);
-            Plugin.Log.LogInfo($"[GF2] cache: evicted {key}");
+            Plugin.Log.LogInfo($"[DollFrame] cache: evicted {key}");
         }
 
         internal PmxParser.PmxModel Model;
@@ -746,7 +785,7 @@ namespace GF2
         }
 
         /// <summary>Built from one packaged character (name/Pmx/Textures, see PmxContainer).</summary>
-        internal static PmxAssets Get(string cacheKey, byte[] pmxBytes, Dictionary<string, byte[]> textureBytes, int maxTexSize, bool flipUv, string[] accessoryPatterns)
+        internal static PmxAssets Get(string cacheKey, byte[] pmxBytes, Dictionary<string, byte[]> textureBytes, int maxTexSize, bool flipUv, string[] accessoryPatterns, string cacheDir = null)
         {
             if (Cache.TryGetValue(cacheKey, out var cached))
             {
@@ -791,11 +830,20 @@ namespace GF2
             var opaqueShader = ResolveCharacterShader();
             var transparentShader = ShaderManager.ResolveTransparentShader();
             if (opaqueShader == null)
-                Plugin.Log.LogError("[GF2] Character shader not found; materials will be unlit pink");
+                Plugin.Log.LogError("[DollFrame] Character shader not found; materials will be unlit pink");
             var materials = new List<Material>();
             int faceMatIdx = -1;
             for (int i = 0; i < pmx.Mats.Length; i++)
-                if (pmx.Mats[i].Name == "Face") { faceMatIdx = i; break; }
+                if (string.Equals(pmx.Mats[i].Name, "Face", StringComparison.OrdinalIgnoreCase)) { faceMatIdx = i; break; }
+            if (faceMatIdx < 0)
+            {
+                for (int i = 0; i < pmx.Mats.Length; i++)
+                {
+                    var mn = pmx.Mats[i].Name ?? "";
+                    if (mn.IndexOf("face", StringComparison.OrdinalIgnoreCase) >= 0 || mn.Contains("顔"))
+                    { faceMatIdx = i; break; }
+                }
+            }
             int faceSlot = -1;
             foreach (int i in a.KeptMaterialIdx)
             {
@@ -808,7 +856,7 @@ namespace GF2
                 var matShader = isTransparent ? (transparentShader ?? opaqueShader) : opaqueShader;
                 var m = new Material(matShader ?? Shader.Find("Sprites/Default"))
                 {
-                    name = "GF2_" + mat.Name,
+                    name = "DollFrame_" + mat.Name,
                     hideFlags = HideFlags.DontUnloadUnusedAsset
                 };
                 if (mat.TexIdx >= 0 && textures.TryGetValue(mat.TexIdx, out var tex))
@@ -826,7 +874,7 @@ namespace GF2
             {
                 SdfFaceLoader.FaceBasis(pmx, faceMatIdx, out var faceF, out var faceR);
                 if (faceF.sqrMagnitude > 0.9f)
-                    a.SdfFace = SdfFaceLoader.Build(pmx, textureBytes, faceMatIdx, faceF, faceR);
+                    a.SdfFace = SdfFaceLoader.Build(pmx, textureBytes, faceMatIdx, faceF, faceR, flipUv, cacheDir);
             }
             a.UnresolvedTextures = unresolved.ToArray();
             a.Textures = textures.Values.ToArray();
@@ -836,8 +884,8 @@ namespace GF2
             int doubleSided = 0;
             if (headMesh != null && headMesh.TriangleCount > 0)
             {
-                a.Mesh = BuildUnityMesh("GF2_" + pmx.Name + "_Body", bodyMesh, pmx, a.KeptMaterialIdx, flipUv, ref doubleSided, out a.SkinBones);
-                a.HeadMesh = BuildUnityMesh("GF2_" + pmx.Name + "_Head", headMesh, pmx, a.KeptMaterialIdx, flipUv, ref doubleSided, out a.HeadSkinBones);
+                a.Mesh = BuildUnityMesh("DollFrame_" + pmx.Name + "_Body", bodyMesh, pmx, a.KeptMaterialIdx, flipUv, ref doubleSided, out a.SkinBones);
+                a.HeadMesh = BuildUnityMesh("DollFrame_" + pmx.Name + "_Head", headMesh, pmx, a.KeptMaterialIdx, flipUv, ref doubleSided, out a.HeadSkinBones);
             }
             else
             {
@@ -852,7 +900,7 @@ namespace GF2
                     BoundsMin = pmx.BoundsMin,
                     BoundsMax = pmx.BoundsMax
                 };
-                a.Mesh = BuildUnityMesh("GF2_" + pmx.Name, fullMesh, pmx, a.KeptMaterialIdx, flipUv, ref doubleSided, out a.SkinBones);
+                a.Mesh = BuildUnityMesh("DollFrame_" + pmx.Name, fullMesh, pmx, a.KeptMaterialIdx, flipUv, ref doubleSided, out a.SkinBones);
                 a.HeadMesh = null;
                 a.HeadSkinBones = null;
             }
@@ -861,14 +909,14 @@ namespace GF2
             Acquire(cacheKey);
             int triTotal = 0;
             foreach (var tr in pmx.MaterialTris) triTotal += tr.Length;
-            Plugin.Log.LogInfo($"[GF2] pmx loaded: '{pmx.Name}' ({cacheKey}) verts={pmx.Pos.Length} tris={triTotal / 3} " +
+            Plugin.Log.LogInfo($"[DollFrame] pmx loaded: '{pmx.Name}' ({cacheKey}) verts={pmx.Pos.Length} tris={triTotal / 3} " +
                                $"mats={pmx.Mats.Length} kept={a.Materials.Length} (double-sided {doubleSided}) bones={pmx.Bones.Length} " +
                                $"skin={a.SkinBones.Length} height={pmx.BoundsMax.y - pmx.BoundsMin.y:0.0##}u " +
                                $"textures(ok={textures.Count},miss={unresolved.Count})");
             if (a.SkinBones.Length > 255)
-                Plugin.Log.LogWarning($"[GF2] pmx mesh skins {a.SkinBones.Length} bones (>255); some platforms cap skinned bones");
+                Plugin.Log.LogWarning($"[DollFrame] pmx mesh skins {a.SkinBones.Length} bones (>255); some platforms cap skinned bones");
             if (unresolved.Count > 0)
-                Plugin.Log.LogWarning($"[GF2] pmx textures unresolved: {string.Join(", ", a.UnresolvedTextures)}");
+                Plugin.Log.LogWarning($"[DollFrame] pmx textures unresolved: {string.Join(", ", a.UnresolvedTextures)}");
             return a;
         }
 
@@ -979,7 +1027,7 @@ namespace GF2
             }
             catch (Exception e)
             {
-                Plugin.Log.LogWarning($"[GF2] texture {baseName} failed: {e.Message}");
+                Plugin.Log.LogWarning($"[DollFrame] texture {baseName} failed: {e.Message}");
                 return null;
             }
         }

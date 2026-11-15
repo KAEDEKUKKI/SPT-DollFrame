@@ -1,10 +1,35 @@
-# GF2 變更紀錄（Changelog）
+# DollFrame 變更紀錄（Changelog）
+
+## 0.4.0（2026-11-16：藏身處穿模掉進虛空修復）
+
+* **藏身處穿地板掉進虛空修復**：
+  * `CapsulePatches.ApplyScale` / `ApplyDerived` 對 `HideoutPlayer` 直接返回，保留藏身處原版物理膠囊（視覺模型與腳底接地仍由 `CharacterRig` / `GroundOffsetM` 正常處理），避免藏身處傳送時序導致膠囊穿模掉進虛空。
+  * 新增 `ScaledYWithSkin` 保留 `UnityEngine.CharacterController.skinWidth` 偏移，修正 `PlayerCharacterController` 路徑縮放後膠囊底面下沉問題。
+  * 移除 `BodyReplacer.Reapply` 針對 `HideoutPlayer` 的 `+0.05f` 臨時上抬補償。
+* **版本**：client `0.3.18` → `0.4.0`；`ServerMod` 同步 `0.4.0`。
+
+## 角色包製作鏈移除（2026-11-15：回歸純執行期框架；版本維持 0.3.18）
+
+* **移除範圍**：`Packager/` 整個專案（`DollFramePackager` console：PMX→`.gfc` 打包器＋`Program.cs`＋`Stubs.cs`＋`--verify`）與 `tools/` 製作面腳本（`bake_sdf_face.py`、`check_matrix.py`、`extract_bones.py`、`remodel_pmx.py`（已退役）、`rollback_packages.sh`）。本 repo 回歸「執行期＋離線驗證」：41 包 `.gfc`／20 位 `.gf2v` 為完成品部署資產，重打包與語音歸檔產製皆不在本 repo 範疇（語音 `.gf2v` 製作鏈本就在 repo 外）。
+* **雙編譯共享面重接（零行為變動）**：`Packager/MeshSplitter.cs` → `Character/MeshSplitter.cs`（`PmxRuntime` 載入期拆頭/身網格的執行期依賴；main csproj 原以顯式 Include 掛回，遷移後改由資料夾萬用字元納入）；`Packager/Stubs.cs` → `Tests/Stubs.cs`（harness `DOLLFRAME_PMX_PARSER_ONLY` 的最小 UnityEngine 替代面）；`DollFrame.csproj` 移除 `Packager/**` Remove 與 MeshSplitter Include 條目；`Tests/DollFrame.Verify.csproj` 改引 `../Character/MeshSplitter.cs` 與本目錄 `Stubs.cs`。
+* **唯一執行期異動（僅文案，零行為）**：① `character package missing` 警示尾部由「run DollFramePackager to build .gfc files」改為「.gfc packages are prebuilt artifacts placed in this folder」——不再指引已移除的工具；`missing` 失敗標記語意與 `tools/fixtures/bad.log` fixture 相容不變。② `Replace player body` 的 BepInEx 配置描述重寫：移除 `tools/remodel_pmx.py` 引用與過時的「DEFAULT ON / 19 packages REMODELED」敘事，改述現行契約（default OFF、預覽不受影響、off 時零玩家寫入）。③ `SdfFaceShading.cs` 檔頭註解的 `tools/bake_sdf_face.py` 引用改述為「sdf_face.png 烘焙端（repo 外製作管線）」。
+* **驗證面**：`dotnet build -c Release -p:CopyOutputToBepInEx=false` 0 警告 0 錯誤；harness `bindpose`／`split`／`telemetry` 綠（telemetry 確認 18 行族＋4 失敗標記＝22 entries、6 釘點前綴、15 子命令不變）；`check-log.sh` fixtures good=exit 0／bad=exit 1。
+
+## DollFrame 品牌轉換（2026-11-15：GF2 → DollFrame；版本維持 0.3.18）
+
+自 `kukki.GF2` 框架移植並轉換為 **DollFrame**（模組識別無 `kukki.` 前綴）：
+
+* **模組識別**：Plugin GUID 與 Harmony id 均為 `DollFrame`；根命名空間 `GF2`→`DollFrame`（含 `DollFrame.Visibility`／`DollFrame.Tests`／`DollFrame.Server` 子命名空間）。
+* **日誌契約**：行族前綴 `[GF2]`→`[DollFrame]`（18 行族＋4 失敗標記語意不變；`tools/check-log.sh` 與 fixtures 同步；harness `telemetry` 22 entries 驗證通過）。
+* **資產命名**：rig/預覽/卡片等 GameObject 與網格前綴 `GF2_`→`DollFrame_`；素材資料夾 `GF2_Characters`→`DollFrame_Characters`、`GF2_Voices`→`DollFrame_Voices`；著色器套束檔 `gf2_shaders.bundle`→`dollframe_shaders.bundle`（套束**內部** Shader 資產名 `GF2CharacterPBR*`/`GF2/CharacterPBR*` 與 `_GF2Rim*` 全域 Uniform 為已烘焙套束的逐位真值，維持原名並以新名位優先、舊名 fallback 相容）。
+* **部屬面**：`BepInEx/plugins/DollFrame/`（`DollFrame.dll`＋`dollframe_shaders.bundle`＋`DollFrame_Characters/` 41 包 `.gfc`＋`DollFrame_Voices/` 20 位 `.gf2v` 語音）；伺服端 companion 佈署 `user/mods/DollFrame/`（`DollFrame.Server.dll`）。舊 `kukki.GF2` 客戶端資料夾未動，可自行移除。
+* **驗證面**：`Tests/DollFrame.Verify.csproj`（`DollFrameVerify`，15 子命令）全綠（41/41 包 factors/proportions/pairing/grants）；env 旋鈕改約 `DOLLFRAME_PACKAGES_DIR`／`DOLLFRAME_PACKAGES`／`DOLLFRAME_SCALE_DELTA`／`DOLLFRAME_EXPECT_DELTA`（雙編譯 define `DOLLFRAME_PMX_PARSER_ONLY`）。
 
 ## 0.3.13（2026-11-14-13：空手放鬆驅動＋onBeforeRender 時序對齊＋Ribcage 縮放補償）
 
 * **完整架構根因定位（反編譯 `Assembly-CSharp.dll` ＋ `DuckCam.dll` ＋ 實機日誌交叉證明）**：
   1. **EFT `Player.VisualPass()` 每幀強制架槍與扣扳機**：`Player.LateUpdate()` 尾段呼叫 `VisualPass()`，不論是否空手（`EmptyHandsController` 其 prefab `empty_hands_container` 仍帶胸前 `weapon_L/R_IK_marker` 與握槍手掌），每幀必跑 `_limbs[0..1].solver.Update()`（`LimbIK` 將 TP 骨架雙掌拉至胸前）與 `HandPosers[0..1].ManualUpdate()`（`HandPoser.SimpleGrip()` 逐幀覆寫 TP 骨架全部 30 根指骨 `localRotation` 為「右手食指扣扳機＋左手托護木」），且 `Player_anim_controller` 第 0/1 層無空手垂手動畫。因此 0.3.10–0.3.12 於 `!armed` 回退純 FK 鏡射時，實際上是忠實複製了 `VisualPass()` 的架槍手臂與扣扳機十指。
-  2. **為何原版 PMC 在 `DuckCam` 垂手擺臂而 GF2 凍結（`Application.onBeforeRender` 時序斷層）**：`DuckCam.RelaxedArms.Apply`（及 `PoseHold`）註冊於 `Application.onBeforeRender`，執行時機在所有 `LateUpdate()` **之後**、渲染之前；`BodyReplacer` 僅在 `LateUpdate()` 執行 `Drive()`，導致原版 PMC 渲染 `onBeforeRender` 垂手姿態，而 GF2 渲染 `LateUpdate` 的 `VisualPass()` 架槍姿態。
+  2. **為何原版 PMC 在 `DuckCam` 垂手擺臂而 DollFrame 凍結（`Application.onBeforeRender` 時序斷層）**：`DuckCam.RelaxedArms.Apply`（及 `PoseHold`）註冊於 `Application.onBeforeRender`，執行時機在所有 `LateUpdate()` **之後**、渲染之前；`BodyReplacer` 僅在 `LateUpdate()` 執行 `Drive()`，導致原版 PMC 渲染 `onBeforeRender` 垂手姿態，而 DollFrame 渲染 `LateUpdate` 的 `VisualPass()` 架槍姿態。
   3. **持械態第一人稱／藏身處 FreeCamera 伸距萎縮（`0.40m → 0.26m`）**：EFT 在 `PointOfView != ThirdPerson`（含 `FirstPerson` 與藏身處 `FreeCamera`）將 `Ribcage.localScale` 縮為 `0.65`（`_ribcageScaleCompensated`），導致世界座標量測的 `|gamePalm − gameUpper|` 被乘上 `0.65`。
   4. **`rig source:` 誤報與 `Weapon_root` 同名克隆骨防護**：`SkeletonHands`（`Weapon_root_anim`）掛在 `Ribcage`（`Root_Joint` 子樹）下，故 `handsRoot.IsChildOf(rootJoint)` 恆為 `True`。
 * **架構修正（零遊戲骨骼寫入、純 `localRotation` 幀寫不變量 100% 維持）**：
@@ -16,7 +41,7 @@
 
 ## 0.3.12（2026-11-14-12：Armed 判準改約＋綁定源頭執行期驗證）
 
-* **實測反證（用戶 FreeCam 截圖對比）**：原版 PMC 垂手擺臂對照 GF2 模型仍「右手食指扣扳機＋左手向前托護木」**連手指都未變**——指骨走純 FK delta 鏡射、源動則模型必動 ⇒ 鏡射源骨架的指骨同處持槍靜態（狀態閘未生效或綁錯骨架源頭，兩擇一）。
+* **實測反證（用戶 FreeCam 截圖對比）**：原版 PMC 垂手擺臂對照 DollFrame 模型仍「右手食指扣扳機＋左手向前托護木」**連手指都未變**——指骨走純 FK delta 鏡射、源動則模型必動 ⇒ 鏡射源骨架的指骨同處持槍靜態（狀態閘未生效或綁錯骨架源頭，兩擇一）。
 * **Armed 判準改約（用戶指令）**：退役 `HandsController is Player.EmptyHandsController` 身分判定，改唯一判準 `HandsController?.Item is EFT.InventoryLogic.Weapon`——反編譯核實 `Weapon : CompoundItem` 為 runtime 項類基類、`PistolItemClass : Weapon` 全槍械子類命中；Knife/grenade/道具→空手態純鏡射；異常時回 false（鏡射安全方向）。`arm gate:` 行加 `item=<ItemClass>` token。
 * **綁定源頭驗證面**：`BodyReplacer.EmitRigSourceLine`（attach 一次性，行族 `rig source:`）——`root@id/parent`＋`underTPBody`（Root_Joint 是否在 `PlayerBody` GO 子樹）＋`fpHandsInside`（是否圈住 `PlayerBody.SkeletonHands` 第一人稱手部骨架子樹；反編譯核實 PlayerBody 兼持 `SkeletonRootJoint`(TP, :492) 與 `SkeletonHands`(FP, :495) 兩套骨架）。綁定錯源在日誌立判。
 * **判定收斂規則**：日誌 `armed=False ik=False underTPBody=True fpHandsInside=False` 而模型仍凍結 ⇒ 凍結源在遊戲端姿勢產出層（IK 組件/動畫機），依 UnityExplorer 實測值精準治理；`armed=True` ⇒ 帶回 `item=` 型別名對症。
@@ -33,7 +58,7 @@
 
 ## 0.3.10（2026-11-14-10：狀態感知手臂治理——空手凍結根治）
 
-* **根因取證（反編譯 itinybad/SPT-Client-400@54e455a9）**：選單/藏身處「手臂卡死架槍」根因在**遊戲端姿勢源**，與臂鏈 IK 數學無關——①主選單 `PlayerModelLoader` 依「展示武器」寫 `WeaponType` 並由 `MenuPlayerPoser.LateUpdate` 每幀手動 LimbIK 指向武器 markers，GF2 藏走原版身體後構圖只剩「孤兒架槍姿勢」被 rig 忠實鏡射；②藏身處 FP 時 `HideoutPlayerOwner.SetPointOfView` 直接把 `BodyAnimatorCommon.enabled=false`（原版玩家 FP 看不到自己的 TP 身體故無人察覺），FreeCam 仍讀凍結骨架；③FP 手正常＝`EmptyHandsController` 自帶 prefab 動畫機（與 TP body animator 分離）。
+* **根因取證（反編譯 itinybad/SPT-Client-400@54e455a9）**：選單/藏身處「手臂卡死架槍」根因在**遊戲端姿勢源**，與臂鏈 IK 數學無關——①主選單 `PlayerModelLoader` 依「展示武器」寫 `WeaponType` 並由 `MenuPlayerPoser.LateUpdate` 每幀手動 LimbIK 指向武器 markers，DollFrame 藏走原版身體後構圖只剩「孤兒架槍姿勢」被 rig 忠實鏡射；②藏身處 FP 時 `HideoutPlayerOwner.SetPointOfView` 直接把 `BodyAnimatorCommon.enabled=false`（原版玩家 FP 看不到自己的 TP 身體故無人察覺），FreeCam 仍讀凍結骨架；③FP 手正常＝`EmptyHandsController` 自帶 prefab 動畫機（與 TP body animator 分離）。
 * **層 1-a 選單空手契約**：`PreviewProxyDriver.ApplyUnarmedContract` 於 attach 寫 `WeaponType=-1`（原版無武器編碼；`EFT.PlayerAnimator.WEAPON_TYPE`／`WEAPON_TYPE_FLOAT`／`UI_WEAPON_TYPE` 三參數，偏離才寫、逐幀強制）＋**停用 MenuPlayerPoser**（其 LateUpdate 為手動 LimbIK/HandPoser 唯一生產點；本體動畫機由引擎推進不受影響；代價＝失去選單隨機查膛 idle beats）；掛載前原值存檔、`Teardown`/`OnDestroy` 反轉，保 `Vanilla (PMC)` 預覽原構圖；`PreviewProxyDriver` 補 `[DefaultExecutionOrder(32100)]`、每幀 `ArmIkActive=false`。
 * **層 1-b 藏身處復活**：`Patches.PostHideoutSetPointOfView`（postfix `HideoutPlayerOwner.SetPointOfView`）——被替換玩家恢復 `BodyAnimatorCommon.enabled=true`，未替換者零介入。
 * **層 3 狀態閘**：`BodyReplacer.IsArmed`——`player.HandsController is Player.EmptyHandsController`＝空手（Fika/SIT/SPT-VR 同款 idiom）；`ArmIkActive = alive ∧ armed`——空手臂鏈面整面停用、rig 純鏡射原版動畫機垂手/擺臂/待機，持械＝0.3.9 兩骨 IK 照舊；翻轉行 `arm gate: alive=… armed=… ik=… hands=…`（狀態變化才發）。
@@ -45,7 +70,7 @@
 * **TwoBoneIKConstraintJob 對齊重寫（0.3.9 內部迭代，版本不動）**：臂鏈兩骨 IK 依 **4 模塊分解**重版——**M1 `Kinematics/ArmRest.cs`**（rest 校準：`ArmRestChain` 收編 TwoBoneIkChain＋具名掌錨＋chest 節點＋收緊半徑）、**M2 動態目標**（raid/預覽統一具名掌錨解析：prefer 精確名 `Base HumanLPalm/RPalm` 於活體骨架錨下，缺漏回退契約錨並記 source=pb*）、**M3 `Kinematics/TwoBoneIk.cs`**（`TwoBoneIkMath` 取代退役 `ArmIk.cs`/`ArmIkMath`；pole 改 **chest 局部空間**——胸腔彎/傾時彎曲平面跟隨胸腔；胸腔 SDF 半徑收緊＝clamp(0.6×|chest→上臂 attach 距|＋0.02, 0.09, 0.18)，缺量測回退 0.13）、**M4 手腕/十指 delta 映射**（腕 cross-axis 特殊通道退役、併回單一 baked/live delta 映射面）；求解公式（目標伸出/reach 箝制/扭轉重分配/pole fallback/SDF 擠出）與 8 支 harness 情境逐項保持原 0.3.9 已驗數學逐位等效。
 * **零位置寫入不變量不變**：IK 只產 world 旋轉（`Drive` 經 `LocalFromWorld` 寫 localRotation，零 localPosition/localScale 幀寫）；手腕/十指維持 palmL/R 原複製，其它骨照常 FK/live。**掌扭量 50% 落前臂**（`TwoBoneIkMath.TwistAngle` 量遊戲掌相對 attach 掌繞臂軸扭量、w&lt;0 先翻轉、(−π,π] 纏回；ForeWorld 以扭量繞臂軸 roll，腕端由 LocalFromWorld 逐幀補償父層 roll，手部姿態不變、前臂網格承載共享扭量）。胸腔 SDF：圓球心＝上半身2 rig 節點，半徑＝clamp(0.6×|chest→上臂 attach 距|＋0.02, 0.09, 0.18)（缺量測 0.13；重寫收緊，肘/掌擠出帶變窄、軀幹外緣更貼）；肘/掌入球沿球面擠出（≤3 迭代，|E−S|＝L1、|H−E|＝L2 恆等）。肘 pole＝**上半身2 chest 局部空間**（Build 自 rig 根空間規約「下 −Y×1.0／外 ×0.6／後 −Z×0.4」經 chest attach 世界旋轉反變換捕捉；每幀由 `TwoBoneIkMath.Solve` 經 chest 世界旋轉升回世界——胸腔彎曲/前傾時彎曲平面跟隨胸腔）；pole 與臂軸夾角 sin<0.12（近平行）時 `RigAim.Perpendicular` 決定性 fallback——防近退化 1/|cross| 方向放大造成彎曲平面逐幀翻面（直立靜止旋轉逐位恆定，harness 60 幀逐位釘＋rest 軸偏移 identity 釘）。**父鏈錨定（旋轉協變）**：swing/rest 軸與扭量基準錨定本幀父鏈世界像（`parentWorld ∘ localChildAxis`、扭量經 `upperWorld ∘ InitRotUpper⁻¹ ∘ ChainGamePalm0` 共軛式）——轉動人物（父鏈轉 R）整臂剛性跟轉、相對軀幹零自旋（harness 旋轉協變釘 57° yaw 對照）。
 * **生存關與配置**：`BodyReplacer.LateUpdate` 逐幀寫 `ArmIkActive`＝alive（死亡/布娃娃回退 FK 複製；預覽路徑恆 true）；cfg `Visual/IK arm retarget to game hands`（24→25 鍵，預設 true，Build 時讀取、變更需重新掛載）off 時面不掛。IK 面骨不入 parity 採樣與 drive fallback 計數（目標非 FK 配對真值，註解標明）。
-* **telemetry/harness**：`ik:` 行族雙形（行族維持 14；attach 一次性行 `CharacterRig.SetupArmRest`：`cfg=on L=ok palm=BaseHumanLPalm ratio=0.87 len=0.48m R=ok palm=BaseHumanRPalm …`／`skip:<reason>`／`cfg=off`；**新增節流行** `CharacterRig.EmitIkTargetLine`：`[GF2] ik target: L dir=(0.05,-0.25,0.97) reach=0.31m …`——≥0.25s（unscaled）節流、單一生產者、未驅動側省略 token；fixture 同步）。harness 維持 15 子命令——`ik` 對齊重寫（8 場景：rest-identity／dynamic-track／pole chest-follow／rotation-covariance 57°＋60 幀站立恆定／近平行 pole 箝制／退化回退／finger-delta（FrameMap 語義十指映射）／zero-stretch SDF 恆等／GameArmChainM 對 `analysis/eft_skeleton.json` 凍結 dump 釘點）。
+* **telemetry/harness**：`ik:` 行族雙形（行族維持 14；attach 一次性行 `CharacterRig.SetupArmRest`：`cfg=on L=ok palm=BaseHumanLPalm ratio=0.87 len=0.48m R=ok palm=BaseHumanRPalm …`／`skip:<reason>`／`cfg=off`；**新增節流行** `CharacterRig.EmitIkTargetLine`：`[DollFrame] ik target: L dir=(0.05,-0.25,0.97) reach=0.31m …`——≥0.25s（unscaled）節流、單一生產者、未驅動側省略 token；fixture 同步）。harness 維持 15 子命令——`ik` 對齊重寫（8 場景：rest-identity／dynamic-track／pole chest-follow／rotation-covariance 57°＋60 幀站立恆定／近平行 pole 箝制／退化回退／finger-delta（FrameMap 語義十指映射）／zero-stretch SDF 恆等／GameArmChainM 對 `analysis/eft_skeleton.json` 凍結 dump 釘點）。
 * **三項用戶驗收準則**（本版設計依此釘點）：① 手端對位——TP 手沿遊戲肩→掌方向自然伸展至持槍位置（握把對位可視驗收）；② 手指/手堂零縮放零位移——100% 作者原始，不重演 0.3.6 前臂鏈放大與 0.3.7 腕端位移（rotation-only 不變量，harness `ik`/`zerostretch` 釘死）；③ 腕/手姿態逐幀複製不變——掌扭量僅落前臂網格（50% 重分配），手局部旋轉維持 palmL/R 原複製。
 * 版本 0.3.8 → 0.3.9（client；`ServerMod` 版本隨自身 csproj，本版未動）。
 
@@ -98,7 +123,7 @@
 
 ## 0.3.1（2026-11-14-2：raid 建模停用）
 
-* **raid 側建模停用（用戶實測回饋）**：MMD 原始比例模型在 pristine FBAK 骨架上手臂/手拉長變形，且與原生 PMC 手並存時握把對不上——`Replace player body` 預設改 **false**；off 時模組對玩家**零寫入**（掛鉤審計：Patches/BodyReplacer/EquipmentHide 首行短路＋CapsulePatches 五 postfix 字典失效），動作與視角完全還給遊戲原生。現場 `kukki.GF2.cfg` 移除重生成以套用新預設。
+* **raid 側建模停用（用戶實測回饋）**：MMD 原始比例模型在 pristine FBAK 骨架上手臂/手拉長變形，且與原生 PMC 手並存時握把對不上——`Replace player body` 預設改 **false**；off 時模組對玩家**零寫入**（掛鉤審計：Patches/BodyReplacer/EquipmentHide 首行短路＋CapsulePatches 五 postfix 字典失效），動作與視角完全還給遊戲原生。現場 `DollFrame.cfg` 移除重生成以套用新預設。
 * **重新啟用條件**：模型重新建模至比例貼合遊戲骨架（臂鏈 k ≈ 1.0）後再開啟；此前 raid 即純原生 PMC。
 * 選單 3D 預覽與角色卡維持可用；版本 0.3.0 → 0.3.1（client＋server 同步）。
 
@@ -113,7 +138,7 @@
 * **契約重列**：配置鍵 27→24；日誌釘點 8→6（`scale:` 入列）、失敗標記 5→4（`diverges` 隨 armik-frame 退役除名）、行族 20→13（新增 `scale:`/`fp head mask:`）；harness 23→14 子命令（退役 spring/unispring/smrmask 之外 10 支、新增 `proportions`）；`check-log.sh`/fixtures/`check_matrix.py`（恰 19 包）同步。
 * **版本**：0.2.0 → 0.3.0。
 
-本文檔記錄 GF2 專案之核心架構演進、功能發布與關鍵缺陷修復歷史。
+本文檔記錄 DollFrame 專案之核心架構演進、功能發布與關鍵缺陷修復歷史。
 
 ---
 
@@ -156,7 +181,7 @@
 ## 2026-11-12：握把、眼位閉合與專案架構全量重修
 
 ### 1. 右手主握把空抓防護（`WeaponAlignment`）
-* **問題**：反編譯 `Player.IkProcess` 發現，G28、RFB 等無獨立右手 GripPose 的武器，其 `_ikTargets[1]` 恆為 null。先前邏輯回退至男模動畫手掌錨點（`pb.RightPalm`），使較短的 GF2 女模手臂產生 0.9~2.7cm 缺口形成右手空抓。
+* **問題**：反編譯 `Player.IkProcess` 發現，G28、RFB 等無獨立右手 GripPose 的武器，其 `_ikTargets[1]` 恆為 null。先前邏輯回退至男模動畫手掌錨點（`pb.RightPalm`），使較短的 DollFrame 女模手臂產生 0.9~2.7cm 缺口形成右手空抓。
 * **修復**：`_ikTargets[1]` 為 null 時，優先回退遊戲武器階層自身的原生 `weapon_R_IK_marker`（武器真值），雙手緊密貼合武器。
 
 ### 2. 第一人稱相機眼位動態閉合與姿態感知閘門（`FirstPersonCamera`）
@@ -211,7 +236,7 @@
 * **第一人稱視野平面重構**：
   * 反編譯確認 `HandsContainer.CameraOffset` 為 PWA 靜態讀取輸入，改採每幀自 pristine 基準絕對疊加校準量，修復相機與武器下沉殘差。
 * **日誌行族登記制（`TelemetryRegistry`）**：
-  * 集中登記 17 個行族與 5 個失敗標記，新增 `[GF2] armik-frame:` 逐幀握持觀測行，使 `diverges` 具備首個 runtime 生產者。
+  * 集中登記 17 個行族與 5 個失敗標記，新增 `[DollFrame] armik-frame:` 逐幀握持觀測行，使 `diverges` 具備首個 runtime 生產者。
 
 ---
 
@@ -228,7 +253,7 @@
 * **SkeletonFit 邊界收斂**：
   * 手臂鏈停止縮放擬合，僅縮放腿部、骨盆與脊椎，維持原版 FBAK 與瞄準管線純度。
 * **選單介面與即時切換**：
-  * 實作全般畫面頂部 `＜ GF2 角色 ＞` 切換列（`CharacterSwitchUI`）與主選單 `Page Up` 快捷鍵；主選單 3D 預覽（`PreviewProxy`）100% 複用戰局骨架驅動。
+  * 實作全般畫面頂部 `＜ DollFrame 角色 ＞` 切換列（`CharacterSwitchUI`）與主選單 `Page Up` 快捷鍵；主選單 3D 預覽（`PreviewProxy`）100% 複用戰局骨架驅動。
 
 ---
 
@@ -239,5 +264,5 @@
   * **全面確立「每角色獨立 PMX Rig 實例」架構**：在玩家 `Root_Joint` 下建立完整的 PMX Transform 階層與獨立 SkinnedMeshRenderer，以純旋轉驅動，構造保證結構零拉伸。
 * **基礎設施建立**：
   * 建立 PMX 轉 `.gfc` 二進位封裝格式與 `Packager` 工具。
-  * 建立 net8.0 離線驗證工具（`Tests/GF2.Verify`），脫離 Unity 引擎自動化斷言骨骼綁定矩陣、比例因子與映射契約。
+  * 建立 net8.0 離線驗證工具（`Tests/DollFrame.Verify`），脫離 Unity 引擎自動化斷言骨骼綁定矩陣、比例因子與映射契約。
   * 建立 `tools/check-log.sh` 日誌契約與 8 個 pinned 前綴守護網。

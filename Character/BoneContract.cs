@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace GF2
+namespace DollFrame
 {
     /// <summary>
     /// THE single anatomical contract: PMX bone name -> game anchor key, shared by the

@@ -6,11 +6,11 @@
 // 0.3.9 重寫差異：pole 改記 **chest 局部空間**（PoleLocalChest＝Build 捕捉、每幀經 chestRotNow
 // 升回世界——胸腔彎曲/前傾時彎曲平面跟隨胸腔，不再錨定 rig 根）；胸腔 SDF 半徑 Build 期由
 // ArmRest 收緊（clamp(0.6×|chest→上臂 attach|＋0.02, 0.09, 0.18)，缺量測 0.13）。
-// 純 System.Numerics（無 Unity 型別），雙編譯進 Tests（GF2_PMX_PARSER_ONLY）——zerostretch 同款共用。
+// 純 System.Numerics（無 Unity 型別），雙編譯進 Tests（DOLLFRAME_PMX_PARSER_ONLY）——zerostretch 同款共用。
 using System;
 using Snx = System.Numerics;
 
-namespace GF2
+namespace DollFrame
 {
     /// <summary>
     /// 兩骨 IK 純數學權威（雙編譯）。遊戲跨距常數來自 analysis/eft_skeleton.json

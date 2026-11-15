@@ -1,7 +1,7 @@
 using System;
 using Snx = System.Numerics;
 
-namespace GF2
+namespace DollFrame
 {
     /// <summary>
     /// Pure retarget/aim math for the per-character rig driver (System.Numerics only,
@@ -9,7 +9,7 @@ namespace GF2
     /// decision here and relabels the 4/3 floats at the Transform boundary; both UnityEngine
     /// and System.Numerics quaternions are standard Hamilton products under column-vector
     /// application (a * b applies b first), so the relabel is an exact field copy - no
-    /// duplicated formula anywhere: Tests/GF2.Verify's `zerostretch` subcommand drives the
+    /// duplicated formula anywhere: Tests/DollFrame.Verify's `zerostretch` subcommand drives the
     /// SAME RigAim over a simulated transform tree.
     /// Derivation (the pivot math, user-decreed). The character is an INDEPENDENT rig
     /// instance whose bone pivots never move (fixed pmx local offsets, fixed scales), so

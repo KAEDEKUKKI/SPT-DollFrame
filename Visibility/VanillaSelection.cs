@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
 
-namespace GF2
+namespace DollFrame
 {
     /// <summary>
     /// Pure helpers for handling the "Vanilla (PMC)" selection option.
-    /// Pure C# (no Unity dependencies) so it can be verified in Tests/GF2Verify.
+    /// Pure C# (no Unity dependencies) so it can be verified in Tests/DollFrameVerify.
     /// </summary>
     public static class VanillaSelection
     {

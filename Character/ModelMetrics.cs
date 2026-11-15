@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace GF2
+namespace DollFrame
 {
     /// <summary>
     /// Shared, parser-only model metrics: canonical bone validation, bounds/hip/ground

@@ -6,7 +6,7 @@ using EFT;
 using HarmonyLib;
 using UnityEngine;
 
-namespace GF2
+namespace DollFrame
 {
     /// <summary>
     /// 【Character 主模塊核心宿主：BodyReplacer】
@@ -37,7 +37,7 @@ namespace GF2
         // 次要連動：1D 頭部開關（FirstPersonSMRMask，唯一保留的視角面）、2A 原版素體隱藏
         private readonly FirstPersonSMRMask _headMask = new FirstPersonSMRMask();
         private readonly VanillaBodyHider _vanillaHider = new VanillaBodyHider();
-        private readonly GF2.Visibility.EquipmentSlotHider _equipHider = new GF2.Visibility.EquipmentSlotHider();
+        private readonly DollFrame.Visibility.EquipmentSlotHider _equipHider = new DollFrame.Visibility.EquipmentSlotHider();
         private float _lastEquipSyncTime = -10f;
         private Func<(bool fp, bool alive)> _povQuery;
         private (bool fp, bool alive) _lastPov = (false, true);
@@ -74,12 +74,6 @@ namespace GF2
             var existing = player.gameObject.GetComponent<BodyReplacer>();
             ReleaseAndDestroy(existing, suppressRestore: !VanillaSelection.IsVanilla(Plugin.Character?.Value));
             Apply(player);
-            if (player is HideoutPlayer && Plugin.CapsuleScaleEnabled.Value)
-            {
-                // 藏身處即時切換模型時膠囊尺寸變化可能使底面貼近或略低於地板，微幅上抬並同步 PhysX 避免穿模掉進虛空
-                player.Transform.position += Vector3.up * 0.05f;
-                Physics.SyncTransforms();
-            }
         }
 
         internal static void Apply(Player player)
@@ -108,7 +102,7 @@ namespace GF2
                     if (newRoot != null && existing._rootJoint != null && existing._rootJoint != newRoot)
                     {
                         reinit = true;
-                        Plugin.Log.LogInfo($"[GF2] re-init: skeleton instance changed on '{player.Profile?.Nickname}' (rig rebuild + re-attach)");
+                        Plugin.Log.LogInfo($"[DollFrame] re-init: skeleton instance changed on '{player.Profile?.Nickname}' (rig rebuild + re-attach)");
                         ReleaseAndDestroy(existing);
                     }
                     else
@@ -132,7 +126,7 @@ namespace GF2
                 if (!_missingLogged)
                 {
                     _missingLogged = true;
-                    Plugin.Log.LogWarning($"[GF2] character package missing for '{Plugin.Character.Value}' in '{Plugin.CharactersDirectory}' (run GF2Packager to build .gfc files)");
+                    Plugin.Log.LogWarning($"[DollFrame] character package missing for '{Plugin.Character.Value}' in '{Plugin.CharactersDirectory}' (place PMX character folders here)");
                 }
                 return;
             }
@@ -142,11 +136,11 @@ namespace GF2
                 RemoveStraySkins(player, null, null);
 
                 var rootJoint = player.PlayerBones != null ? player.PlayerBones.RootJoint : null;
-                if (rootJoint == null) { Plugin.Log.LogError("[GF2] Root_Joint missing; body not replaced"); return; }
+                if (rootJoint == null) { Plugin.Log.LogError("[DollFrame] Root_Joint missing; body not replaced"); return; }
                 if (!Mathf.Approximately(rootJoint.localScale.x, 1f))
                 {
                     rootJoint.localScale = Vector3.one;
-                    Plugin.Log.LogInfo("[GF2] Root_Joint reset to scale 1 (independent rig route)");
+                    Plugin.Log.LogInfo("[DollFrame] Root_Joint reset to scale 1 (independent rig route)");
                 }
                 EmitRigSourceLine(player, rootJoint);
 
@@ -161,11 +155,11 @@ namespace GF2
                     out var pkgName, out var warm, out var preloadMs);
                 if (assets == null)
                 {
-                    Plugin.Log.LogWarning($"[GF2] package '{pkgName}' failed to load - body not replaced this init");
+                    Plugin.Log.LogWarning($"[DollFrame] package '{pkgName}' failed to load - body not replaced this init");
                     return;
                 }
                 if (!warm)
-                    Plugin.Log.LogInfo($"[GF2] preload: {pkgName} {preloadMs:0.##}ms (cold)");
+                    Plugin.Log.LogInfo($"[DollFrame] preload: {pkgName} {preloadMs:0.##}ms (cold)");
 
                 var metrics = ModelMetrics.Compute(assets.Model, Plugin.PmxUnitScale.Value, raidDump);
                 LastFactorsByPackage[pkgName] = metrics.Factors;
@@ -180,7 +174,7 @@ namespace GF2
                     ? metrics.HeightM * scale.Value.K
                     : metrics.HeightM;
 
-                Plugin.Log.LogInfo($"[GF2] ground: derived {metrics.GroundOffsetM:0.####}m (override {Plugin.PmxYOffset.Value:0.####})");
+                Plugin.Log.LogInfo($"[DollFrame] ground: derived {metrics.GroundOffsetM:0.####}m (override {Plugin.PmxYOffset.Value:0.####})");
                 var attach = Stopwatch.StartNew();
                 var rig = CharacterRig.Build(rootJoint, games, assets,
                     Plugin.PmxUnitScale.Value, Plugin.PmxYaw.Value, Plugin.PmxYOffset.Value + metrics.GroundOffsetM, 0,
@@ -189,9 +183,9 @@ namespace GF2
                 MeshCopies++;
                 attach.Stop();
                 var attachMs = attach.Elapsed.TotalMilliseconds;
-                Plugin.Log.LogInfo($"[GF2] attach {attachMs:0.##}ms");
+                Plugin.Log.LogInfo($"[DollFrame] attach {attachMs:0.##}ms");
                 if (warm && attachMs > 16.0)
-                    Plugin.Log.LogWarning($"[GF2] warn: attach exceeded frame budget ({attachMs:0.##}ms)");
+                    Plugin.Log.LogWarning($"[DollFrame] warn: attach exceeded frame budget ({attachMs:0.##}ms)");
 
                 CapsulePatches.ApplyDerived(player, scaledHeightM);
 
@@ -237,11 +231,11 @@ namespace GF2
                     comp._rig.Drive();
                     comp._rig.UpdateSdfFace();
                 }
-                Plugin.Log.LogInfo($"[GF2] body replaced on '{player.Profile?.Nickname}': vanilla hidden ({comp._vanillaHider.HiddenCount} renderers){(reinit ? " (re-init)" : "")} builds={Stats.Builds} skins={Stats.LiveSkins} cache={PmxAssets.CacheCount} copies={MeshCopies}\n{GameBones.ContractLine(contract)}");
+                Plugin.Log.LogInfo($"[DollFrame] body replaced on '{player.Profile?.Nickname}': vanilla hidden ({comp._vanillaHider.HiddenCount} renderers){(reinit ? " (re-init)" : "")} builds={Stats.Builds} skins={Stats.LiveSkins} cache={PmxAssets.CacheCount} copies={MeshCopies}\n{GameBones.ContractLine(contract)}");
             }
             catch (Exception e)
             {
-                Plugin.Log.LogError($"[GF2] body replace failed: {e}");
+                Plugin.Log.LogError($"[DollFrame] body replace failed: {e}");
             }
         }
 
@@ -256,14 +250,14 @@ namespace GF2
                     var cur = Path.GetFileName(Plugin.Character?.Value);
                     if (VanillaSelection.IsVanilla(Plugin.Character?.Value))
                     {
-                        Plugin.Log.LogInfo($"[GF2] live character switch to Vanilla (PMC)");
+                        Plugin.Log.LogInfo($"[DollFrame] live character switch to Vanilla (PMC)");
                         Reapply(_player);
                         return;
                     }
                     if (!string.IsNullOrEmpty(cur) && cur != _pkgName)
                     {
                         var p = _player;
-                        Plugin.Log.LogInfo($"[GF2] live character switch on player: '{_pkgName}' -> '{cur}'");
+                        Plugin.Log.LogInfo($"[DollFrame] live character switch on player: '{_pkgName}' -> '{cur}'");
                         Reapply(p);
                         return;
                     }
@@ -283,7 +277,7 @@ namespace GF2
                 if (armIk != _lastArmIk || _armGatePending)
                 {
                     var item = hcNow != null ? hcNow.Item : null;
-                    Plugin.Log.LogInfo($"[GF2] arm gate: alive={povNow.alive} armed={armed} ik={armIk} hands={(hcNow == null ? "<none>" : hcNow.GetType().Name)} item={(item == null ? "-" : item.GetType().Name)}");
+                    Plugin.Log.LogInfo($"[DollFrame] arm gate: alive={povNow.alive} armed={armed} ik={armIk} hands={(hcNow == null ? "<none>" : hcNow.GetType().Name)} item={(item == null ? "-" : item.GetType().Name)}");
                     _lastArmIk = armIk;
                     _armGatePending = false;
                 }
@@ -313,7 +307,7 @@ namespace GF2
                         _headMask.SetPointOfView(
                             masked ? PointOfView.FirstPerson : PointOfView.ThirdPerson,
                             _skin, _headSkin, isAiming: false, isAlive: alive);
-                        Plugin.Log.LogInfo($"[GF2] fp head mask: {(masked ? "ShadowsOnly" : "On")} ({(alive ? "alive" : "dead")})");
+                        Plugin.Log.LogInfo($"[DollFrame] fp head mask: {(masked ? "ShadowsOnly" : "On")} ({(alive ? "alive" : "dead")})");
                     }
                 }
 
@@ -331,7 +325,7 @@ namespace GF2
                 if (Time.unscaledTime - _lastLateUpdateErrorTime > 3.0f)
                 {
                     _lastLateUpdateErrorTime = Time.unscaledTime;
-                    Plugin.Log.LogWarning($"[GF2] BodyReplacer.LateUpdate error: {ex.Message}");
+                    Plugin.Log.LogWarning($"[DollFrame] BodyReplacer.LateUpdate error: {ex.Message}");
                 }
             }
         }
@@ -411,19 +405,19 @@ namespace GF2
                 if (!_suppressRestoreOnDestroy)
                 {
                     try { _equipHider.RestoreAll(); } catch { }
-                    try { _vanillaHider.RestoreVanilla(); } catch (Exception ex) { Plugin.Log.LogWarning($"[GF2] OnDestroy RestoreVanilla error: {ex.Message}"); }
+                    try { _vanillaHider.RestoreVanilla(); } catch (Exception ex) { Plugin.Log.LogWarning($"[DollFrame] OnDestroy RestoreVanilla error: {ex.Message}"); }
                     if (_player != null)
                     {
-                        try { VanillaBodyHider.RestoreAllVanilla(_player); } catch (Exception ex) { Plugin.Log.LogWarning($"[GF2] OnDestroy RestoreAllVanilla error: {ex.Message}"); }
-                        try { CapsulePatches.ApplyScale(_player, 1f); } catch (Exception ex) { Plugin.Log.LogWarning($"[GF2] OnDestroy CapsulePatches.ApplyScale error: {ex.Message}"); }
-                        try { VoiceReplacer.Restore(_player); } catch (Exception ex) { Plugin.Log.LogWarning($"[GF2] OnDestroy VoiceReplacer.Restore error: {ex.Message}"); }
-                        try { IkRefresh.RefreshIK(_player); } catch (Exception ex) { Plugin.Log.LogWarning($"[GF2] OnDestroy RefreshIK error: {ex.Message}"); }
+                        try { VanillaBodyHider.RestoreAllVanilla(_player); } catch (Exception ex) { Plugin.Log.LogWarning($"[DollFrame] OnDestroy RestoreAllVanilla error: {ex.Message}"); }
+                        try { CapsulePatches.ApplyScale(_player, 1f); } catch (Exception ex) { Plugin.Log.LogWarning($"[DollFrame] OnDestroy CapsulePatches.ApplyScale error: {ex.Message}"); }
+                        try { VoiceReplacer.Restore(_player); } catch (Exception ex) { Plugin.Log.LogWarning($"[DollFrame] OnDestroy VoiceReplacer.Restore error: {ex.Message}"); }
+                        try { IkRefresh.RefreshIK(_player); } catch (Exception ex) { Plugin.Log.LogWarning($"[DollFrame] OnDestroy RefreshIK error: {ex.Message}"); }
                     }
                 }
             }
             catch (Exception ex)
             {
-                Plugin.Log.LogWarning($"[GF2] BodyReplacer OnDestroy EFT restore error: {ex.Message}");
+                Plugin.Log.LogWarning($"[DollFrame] BodyReplacer OnDestroy EFT restore error: {ex.Message}");
             }
             finally
             {
@@ -506,11 +500,11 @@ namespace GF2
                 bool underTPBody = body != null && rootJoint.IsChildOf(body.transform);
                 Transform handsRoot = body != null && body.SkeletonHands != null ? body.SkeletonHands.transform : null;
                 bool fpHandsInside = handsRoot != null && rootJoint.IsChildOf(handsRoot);
-                Plugin.Log.LogInfo($"[GF2] rig source: root='{rootJoint.name}'@{rootJoint.GetInstanceID()} parent='{(rootJoint.parent != null ? rootJoint.parent.name : "<null>")}' underTPBody={underTPBody} fpHandsInside={fpHandsInside}");
+                Plugin.Log.LogInfo($"[DollFrame] rig source: root='{rootJoint.name}'@{rootJoint.GetInstanceID()} parent='{(rootJoint.parent != null ? rootJoint.parent.name : "<null>")}' underTPBody={underTPBody} fpHandsInside={fpHandsInside}");
             }
             catch (Exception e)
             {
-                Plugin.Log.LogWarning($"[GF2] rig source: failed: {e.Message}");
+                Plugin.Log.LogWarning($"[DollFrame] rig source: failed: {e.Message}");
             }
         }
 
@@ -518,7 +512,7 @@ namespace GF2
         {
             int removed = RemoveStrays(player.gameObject.transform, owned, ownedHead);
             if (removed > 0)
-                Plugin.Log.LogWarning($"[GF2] stray skins removed on '{player.Profile?.Nickname}': {removed} (double-init guard)");
+                Plugin.Log.LogWarning($"[DollFrame] stray skins removed on '{player.Profile?.Nickname}': {removed} (double-init guard)");
         }
 
         private static int RemoveStrays(Transform root, Transform owned, Transform ownedHead)
@@ -529,7 +523,7 @@ namespace GF2
                 var c = root.GetChild(i);
                 if (c == null) continue;
                 removed += RemoveStrays(c, owned, ownedHead);
-                if (c == owned || c == ownedHead || c.name == null || !c.name.StartsWith("GF2_", StringComparison.Ordinal)) continue;
+                if (c == owned || c == ownedHead || c.name == null || !c.name.StartsWith("DollFrame_", StringComparison.Ordinal)) continue;
                 var smr = c.GetComponent<SkinnedMeshRenderer>();
                 if (smr != null && smr.sharedMesh != null) UnityEngine.Object.DestroyImmediate(smr.sharedMesh);
                 c.SetParent(null, false);
@@ -570,7 +564,7 @@ namespace GF2
             }
             catch (Exception e)
             {
-                Plugin.Log.LogWarning($"[GF2] re-hide after UpdatePlayerRenders failed: {e.Message}");
+                Plugin.Log.LogWarning($"[DollFrame] re-hide after UpdatePlayerRenders failed: {e.Message}");
             }
         }
     }

@@ -1,6 +1,6 @@
 using System;
 
-namespace GF2
+namespace DollFrame
 {
     /// <summary>
     /// The retarget pairing rules over a pmx bone table (pure, parser-safe; the Unity rig

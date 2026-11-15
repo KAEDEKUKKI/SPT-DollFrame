@@ -1,6 +1,6 @@
 // Character/Kinematics/SpringPhysics.cs: 角色次要物理引擎（頭髮、裙擺、絲帶/衣襬、胸部）。
-// 雙編譯設計：純數學層 SpringPhysicsMath 使用 System.Numerics（無 Unity 相依），供 GF2Verify 離線驗證；
-// Unity 執行層 SpringPhysicsRig 包裝於 #if !GF2_PMX_PARSER_ONLY。
+// 雙編譯設計：純數學層 SpringPhysicsMath 使用 System.Numerics（無 Unity 相依），供 DollFrameVerify 離線驗證；
+// Unity 執行層 SpringPhysicsRig 包裝於 #if !DOLLFRAME_PMX_PARSER_ONLY。
 // 硬性不變量：
 // 1. 零拉伸（Zero-Stretch）：每步強制投影至半徑 restLen 球面，僅寫骨節點 localRotation，零 localPosition/localScale 寫入。
 // 2. 幀率無關＋防雙步：dt 限幅 <= 1/30s 並細分步進；同一 Time.frameCount（如 LateUpdate 與 OnBeforeRender）僅步進一次，重繪期僅重套已解 localRotation。
@@ -9,7 +9,7 @@ using System;
 using System.Collections.Generic;
 using Snx = System.Numerics;
 
-namespace GF2
+namespace DollFrame
 {
     public enum SpringCategory
     {
@@ -334,8 +334,8 @@ namespace GF2
     }
 }
 
-#if !GF2_PMX_PARSER_ONLY
-namespace GF2
+#if !DOLLFRAME_PMX_PARSER_ONLY
+namespace DollFrame
 {
     using UnityEngine;
 

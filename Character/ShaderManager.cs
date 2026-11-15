@@ -3,10 +3,10 @@ using System.IO;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace GF2
+namespace DollFrame
 {
     /// <summary>
-    /// 載入並管理自訂 GF2 角色 PBR AssetBundle（gf2_shaders.bundle）：
+    /// 載入並管理自訂 DollFrame 角色 PBR AssetBundle（dollframe_shaders.bundle）：
     /// 提供 Deferred/Forward 相容之環境自適應邊緣光（Rim Light）、布料/絲襪掠射光澤（Sheen）、
     /// Alpha Cutout 與材質分類參數；若 bundle 遺失則自動退回 Unity 內建 Standard Shader。
     /// </summary>
@@ -52,32 +52,37 @@ namespace GF2
             try
             {
                 string dir = Path.GetDirectoryName(typeof(Plugin).Assembly.Location);
-                string bundlePath = string.IsNullOrEmpty(dir) ? null : Path.Combine(dir, "gf2_shaders.bundle");
+                string bundlePath = string.IsNullOrEmpty(dir) ? null : Path.Combine(dir, "dollframe_shaders.bundle");
                 if (string.IsNullOrEmpty(bundlePath) || !File.Exists(bundlePath))
                 {
-                    Plugin.Log.LogInfo("[GF2] shader: gf2_shaders.bundle not found, using Unity Standard fallback");
+                    Plugin.Log.LogInfo("[DollFrame] shader: dollframe_shaders.bundle not found, using Unity Standard fallback");
                     return;
                 }
 
                 _bundle = AssetBundle.LoadFromFile(bundlePath);
                 if (_bundle == null)
                 {
-                    Plugin.Log.LogWarning($"[GF2] shader: failed to load '{bundlePath}', using Standard fallback");
+                    Plugin.Log.LogWarning($"[DollFrame] shader: failed to load '{bundlePath}', using Standard fallback");
                     return;
                 }
 
-                _opaqueShader = _bundle.LoadAsset<Shader>("GF2CharacterPBR") ?? _bundle.LoadAsset<Shader>("GF2/CharacterPBR");
-                _transparentShader = _bundle.LoadAsset<Shader>("GF2CharacterPBRTransparent") ?? _bundle.LoadAsset<Shader>("GF2/CharacterPBRTransparent");
+                // 套束內部 Shader 資產名為既有已烘焙 bundle 的逐位真值（Shaders/UnityBuilder/Assets/Shaders/GF2*.shader
+                // 之 `Shader "GF2/CharacterPBR*"` 名稱與 _GF2Rim* 全域 Uniform 一併釘死，不得改名）；
+                // DollFrame* / DollFrame/ 為未來重烘焙時的新名位（LoadAsset 新名優先、舊名 fallback 兼容既有套束）。
+                _opaqueShader = _bundle.LoadAsset<Shader>("DollFrameCharacterPBR") ?? _bundle.LoadAsset<Shader>("DollFrame/CharacterPBR")
+                             ?? _bundle.LoadAsset<Shader>("GF2CharacterPBR") ?? _bundle.LoadAsset<Shader>("GF2/CharacterPBR");
+                _transparentShader = _bundle.LoadAsset<Shader>("DollFrameCharacterPBRTransparent") ?? _bundle.LoadAsset<Shader>("DollFrame/CharacterPBRTransparent")
+                                  ?? _bundle.LoadAsset<Shader>("GF2CharacterPBRTransparent") ?? _bundle.LoadAsset<Shader>("GF2/CharacterPBRTransparent");
 
                 if (_opaqueShader != null && !_opaqueShader.isSupported) _opaqueShader = null;
                 if (_transparentShader != null && !_transparentShader.isSupported) _transparentShader = null;
 
-                Plugin.Log.LogInfo($"[GF2] shader: loaded gf2_shaders.bundle (opaque={(_opaqueShader != null ? _opaqueShader.name : "fallback")}, transparent={(_transparentShader != null ? _transparentShader.name : "fallback")})");
+                Plugin.Log.LogInfo($"[DollFrame] shader: loaded dollframe_shaders.bundle (opaque={(_opaqueShader != null ? _opaqueShader.name : "fallback")}, transparent={(_transparentShader != null ? _transparentShader.name : "fallback")})");
                 ApplyGlobalRimSettings();
             }
             catch (Exception ex)
             {
-                Plugin.Log.LogWarning($"[GF2] shader: bundle load error ({ex.Message}), using Standard fallback");
+                Plugin.Log.LogWarning($"[DollFrame] shader: bundle load error ({ex.Message}), using Standard fallback");
             }
         }
 

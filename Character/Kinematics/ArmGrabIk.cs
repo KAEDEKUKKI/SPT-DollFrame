@@ -1,7 +1,7 @@
 using System;
 using Snx = System.Numerics;
 
-namespace GF2.Character.Kinematics
+namespace DollFrame.Character.Kinematics
 {
     /// <summary>
     /// 獨立手臂抓取 IK 求解模塊（左右手共用）：

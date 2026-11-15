@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using EFT;
 using UnityEngine;
 
-namespace GF2
+namespace DollFrame
 {
     /// <summary>
     /// THE single game-bone resolver for both rigs: the raid PlayerBones chain and the
@@ -81,7 +81,7 @@ namespace GF2
             var missing = Missing(g);
             if (missing.Count > 0)
             {
-                Plugin.Log.LogError($"[GF2] game anchors unresolved: {string.Join(", ", missing)} - body replace aborted");
+                Plugin.Log.LogError($"[DollFrame] game anchors unresolved: {string.Join(", ", missing)} - body replace aborted");
                 return null;
             }
             return g;
@@ -140,7 +140,7 @@ namespace GF2
             if (missing.Count > 0)
             {
                 if (logMissing)
-                    Plugin.Log.LogWarning("[GF2] skeleton bones unresolved: " + string.Join(", ", missing));
+                    Plugin.Log.LogWarning("[DollFrame] skeleton bones unresolved: " + string.Join(", ", missing));
                 return null;
             }
             return g;
@@ -191,15 +191,15 @@ namespace GF2
         /// The per-attach contract log block (SPEC log contract #1): the pinned one-line
         /// contract line (fallback = CharacterRig.RigStats.skipped - mapped rows whose
         /// game anchor resolved but produced no driver pairing: self-anchored pairs or
-        /// degenerate directions, which inherit rigidly instead) plus one [GF2] contract
+        /// degenerate directions, which inherit rigidly instead) plus one [DollFrame] contract
         /// skip line per unresolved entry; callers append this to the SAME attach log.
         /// Once per attach - never per frame.
         /// </summary>
         internal static string ContractLine((int resolved, int total, int digits, List<string> missing) check)
         {
-            var line = $"[GF2] contract: {check.resolved}/{check.total} anchors, digits {check.digits}, fallback {CharacterRig.RigStats.skipped}";
+            var line = $"[DollFrame] contract: {check.resolved}/{check.total} anchors, digits {check.digits}, fallback {CharacterRig.RigStats.skipped}";
             foreach (var m in check.missing)
-                line += $"\n[GF2] contract skip: {m} (unresolved)";
+                line += $"\n[DollFrame] contract skip: {m} (unresolved)";
             return line;
         }
 
@@ -240,7 +240,7 @@ namespace GF2
             {
                 var n = p.name;
                 if (!string.IsNullOrEmpty(n) && (n.StartsWith("Weapon_root", StringComparison.OrdinalIgnoreCase)
-                    || n.StartsWith("GF2_", StringComparison.Ordinal)))
+                    || n.StartsWith("DollFrame_", StringComparison.Ordinal)))
                     return true;
                 if (p.GetComponent<WeaponPrefab>() != null)
                     return true;
@@ -282,7 +282,7 @@ namespace GF2
         /// stay silent (identical/near-identical factor sets log NOTHING - todo 25 happy
         /// scenario), "no baseline" when raid factors are unavailable (no raid attach
         /// yet), else the pinned single line
-        /// [GF2] parity: &lt;pkg&gt; &lt;label&gt; menu &lt;m&gt; raid &lt;r&gt; (&gt;2%)
+        /// [DollFrame] parity: &lt;pkg&gt; &lt;label&gt; menu &lt;m&gt; raid &lt;r&gt; (&gt;2%)
         /// listing the divergent groups only. Pure over its inputs - the offline parity
         /// harness unit-tests it with synthetic factor sets; callers emit the returned
         /// line at most once per attach.
@@ -291,7 +291,7 @@ namespace GF2
             IReadOnlyDictionary<string, float> raid)
         {
             if (menu == null || raid == null || menu.Count == 0 || raid.Count == 0)
-                return "[GF2] parity: no baseline";
+                return "[DollFrame] parity: no baseline";
             var div = new List<string>();
             foreach (var kv in menu)
             {
@@ -299,7 +299,7 @@ namespace GF2
                 if (Math.Abs(kv.Value - r) / r > 0.02f)
                     div.Add($"{kv.Key} menu {kv.Value:0.###} raid {r:0.###} (>2%)");
             }
-            return div.Count > 0 ? $"[GF2] parity: {pkg} {string.Join(", ", div)}" : null;
+            return div.Count > 0 ? $"[DollFrame] parity: {pkg} {string.Join(", ", div)}" : null;
         }
 
         /// <summary>Keys of AnchorKeys neither exposed (preview mode) nor non-null by the resolved table.</summary>

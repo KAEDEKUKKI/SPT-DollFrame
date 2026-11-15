@@ -6,14 +6,14 @@
 using System;
 using System.Collections.Generic;
 using Snx = System.Numerics;
-#if !GF2_PMX_PARSER_ONLY
+#if !DOLLFRAME_PMX_PARSER_ONLY
 using UnityEngine;
 using UnityEngine.Rendering;
 #endif
 
-namespace GF2
+namespace DollFrame
 {
-#if !GF2_PMX_PARSER_ONLY
+#if !DOLLFRAME_PMX_PARSER_ONLY
     /// <summary>0.3.9 臂鏈 IK 面骨分派：None＝純 FK 面；Upper＝上臂求解面（每幀兩骨 IK 生產者）；Fore＝前臂消費面（讀取同次求解的 ForeWorld）。</summary>
     internal enum ArmIkRole
     {
@@ -137,7 +137,7 @@ namespace GF2
         // 0.3.9 臂鏈 IK 狀態（attach 一次性捕捉、每幀純旋轉求解）：
         // 每側 ArmRestChain（M1 校準：TwoBoneIkChain＋具名掌錨＋chest 節點＋收緊半徑，ArmRest.cs）；
         // _armIkForeTarget 為幀內上臂面喂前臂面的 ForeWorld（pmx 順序上臂(32)＜前臂(37)保證先解後用）；
-        // _ikTargetDir/_ikTargetReach 為每幀目標取樣，由 EmitIkTargetLine 節流彙整為 [GF2] ik target: 行。
+        // _ikTargetDir/_ikTargetReach 為每幀目標取樣，由 EmitIkTargetLine 節流彙整為 [DollFrame] ik target: 行。
         internal bool Alive = true;                 // 存活狀態閘：死亡／布娃娃時回退純 FK 鏡射
         internal bool InFirstPerson = false;        // 第一人稱視角閘
         internal bool ArmIkActive = false;          // 持械狀態閘：BodyReplacer 逐幀寫 alive∧armed（選單＝false）
@@ -152,7 +152,7 @@ namespace GF2
         private Transform _gameThighL, _gameKneeL, _gameThighR, _gameKneeR;
         private readonly Snx.Vector3?[] _ikTargetDir = new Snx.Vector3?[2];
         private readonly float[] _ikTargetReach = new float[2];
-        private float _ikTargetNext;        // [GF2] ik target: 行節流閘（≥0.25s，unscaled）
+        private float _ikTargetNext;        // [DollFrame] ik target: 行節流閘（≥0.25s，unscaled）
         private Transform _chestNode;       // 胸腔中心（上半身2 rig 節點；SDF 圓球心）
 
         /// <summary>Stats of the last Build (the contract line's fallback source, GameBones.ContractLine).</summary>
@@ -162,7 +162,7 @@ namespace GF2
         /// <summary>
         /// Builds the rig instance under <paramref name="attachParent"/> (game Root_Joint /
         /// preview skeleton root) and returns the driver. Emits the SPEC log contract #2:
-        /// [GF2] rig: bones=&lt;n&gt; mapped=&lt;m&gt;.
+        /// [DollFrame] rig: bones=&lt;n&gt; mapped=&lt;m&gt;.
         /// </summary>
         internal static CharacterRig Build(Transform attachParent, Dictionary<string, Transform> games,
             PmxAssets assets, float unitScale, float yaw, float yOffset, int layer,
@@ -173,7 +173,7 @@ namespace GF2
             var digits = DigitAnchors(games);
 
             // placement root: the pre-pivot proxy-rig pivot recipe + the old reskin placement terms
-            var rootGo = new GameObject("GF2_rig_" + pmx.Name);
+            var rootGo = new GameObject("DollFrame_rig_" + pmx.Name);
             var root = rootGo.transform;
             root.SetParent(attachParent, false);
             root.localPosition = new Vector3(0f, yOffset, 0f);
@@ -366,7 +366,7 @@ namespace GF2
             // skinned mesh: the decree bind - every slot bone binds its OWN rig node, so
             // bindpose = rigNode.worldToLocal * rigRoot.l2w and world(v, t0) = rigRoot.l2w * v
             var mesh = UnityEngine.Object.Instantiate(assets.Mesh);
-            mesh.name = "GF2_rigmesh_" + pmx.Name;
+            mesh.name = "DollFrame_rigmesh_" + pmx.Name;
             var slots = assets.SkinBones;
             var slotBones = new Transform[slots.Length];
             var binds = new Matrix4x4[slots.Length];
@@ -395,7 +395,7 @@ namespace GF2
             if (assets.HeadMesh != null && assets.HeadSkinBones != null && assets.HeadSkinBones.Length > 0)
             {
                 var headMesh = UnityEngine.Object.Instantiate(assets.HeadMesh);
-                headMesh.name = "GF2_righeadmesh_" + pmx.Name;
+                headMesh.name = "DollFrame_righeadmesh_" + pmx.Name;
                 var headSlots = assets.HeadSkinBones;
                 var headSlotBones = new Transform[headSlots.Length];
                 var headBinds = new Matrix4x4[headSlots.Length];
@@ -508,7 +508,7 @@ namespace GF2
             rig._groundNextTry = Time.unscaledTime;
             rig._groundSamplesLeft = 3;
 
-            Plugin.Log.LogInfo($"[GF2] rig: bones={bones.Length} mapped={rig._entries.Count} grants={grants}");
+            Plugin.Log.LogInfo($"[DollFrame] rig: bones={bones.Length} mapped={rig._entries.Count} grants={grants}");
             return rig;
         }
 
@@ -524,7 +524,7 @@ namespace GF2
         {
             if (!cfgOn)
             {
-                Plugin.Log.LogInfo("[GF2] ik: cfg=off");
+                Plugin.Log.LogInfo("[DollFrame] ik: cfg=off");
                 return;
             }
 
@@ -608,7 +608,7 @@ namespace GF2
             }
 
             // 行面（單一 attach 行）：ok 側帶 palm/ratio/len；skip 側僅狀態（skip:<reason>）
-            var line = $"[GF2] ik: cfg=on L={states[0]}";
+            var line = $"[DollFrame] ik: cfg=on L={states[0]}";
             if (rig._armRestSide[0] is ArmRestChain lRest)
                 line += $" palm={lRest.PalmSource} ratio={lRest.Chain.ArmRatio:0.##} len={lRest.Chain.L1 + lRest.Chain.L2:0.##}m";
             line += $" R={states[1]}";
@@ -721,7 +721,7 @@ namespace GF2
                 {
                     _parityLinesLeft--;
                     _parityNext = Time.unscaledTime + 30f;
-                    Plugin.Log.LogInfo($"[GF2] pose-parity baked={_driveFallback}/{_driveTotal}{parityLine}");
+                    Plugin.Log.LogInfo($"[DollFrame] pose-parity baked={_driveFallback}/{_driveTotal}{parityLine}");
                 }
 
                 GroundCheck();
@@ -731,7 +731,7 @@ namespace GF2
                 if (Time.unscaledTime - _lastDriveErrorTime > 3.0f)
                 {
                     _lastDriveErrorTime = Time.unscaledTime;
-                    Plugin.Log.LogWarning($"[GF2] CharacterRig.Drive error: {ex.Message}");
+                    Plugin.Log.LogWarning($"[DollFrame] CharacterRig.Drive error: {ex.Message}");
                 }
             }
         }
@@ -968,7 +968,7 @@ namespace GF2
                             ? Snx.Vector3.Distance(VecS(Bones[en.PmzMate].position), clavPos)
                             : 0.10f;
                         var chain = rest.Value.Chain;
-                        target = GF2.Character.Kinematics.ArmGrabIkMath.SolveClavicle(
+                        target = DollFrame.Character.Kinematics.ArmGrabIkMath.SolveClavicle(
                             in chain, clavPos, parentWorld, lChild, clavSpan, wristTargetPos);
                         return true;
                     }
@@ -978,7 +978,7 @@ namespace GF2
                         var chain = rest.Value.Chain;
                         if (runHangIk)
                         {
-                            var res = GF2.Character.Kinematics.ArmGrabIkMath.SolveRelaxedHang(
+                            var res = DollFrame.Character.Kinematics.ArmGrabIkMath.SolveRelaxedHang(
                                 in chain, VecS(bone.position), _armHangTarget[side], _armHangPole[side],
                                 VecS(_chestNode.position), rest.Value.ChestRadius, parentWorld);
                             if (!res.Ok) return false;
@@ -988,7 +988,7 @@ namespace GF2
                         }
                         var palm = rest.Value.PalmBone != null ? rest.Value.PalmBone : en.GameBone;
                         var wristTargetPos = ComputePreciseWristTarget(palm, rest.Value);
-                        var grabRes = GF2.Character.Kinematics.ArmGrabIkMath.SolveTwoBone(
+                        var grabRes = DollFrame.Character.Kinematics.ArmGrabIkMath.SolveTwoBone(
                             in chain, VecS(bone.position), wristTargetPos, QuatS(palm.rotation),
                             VecS(_chestNode.position), QuatS(_chestNode.rotation),
                             rest.Value.ChestRadius * 0.70f, parentWorld);
@@ -1043,7 +1043,7 @@ namespace GF2
         /// <summary>
         /// 0.3.9 臂鏈 IK 目標節流行（單一生產者）：本幀至少一側上臂面 IK 依驅動（ArmIkActive 且
         /// 求解 Ok）時，≥0.25s 間隔（unscaled time）輸出一次
-        /// [GF2] ik target: L dir=(x,y,z) reach=…m R dir=… reach=…m（未驅動側省略 token；純觀測零行為）。
+        /// [DollFrame] ik target: L dir=(x,y,z) reach=…m R dir=… reach=…m（未驅動側省略 token；純觀測零行為）。
         /// </summary>
         private void EmitIkTargetLine()
         {
@@ -1051,7 +1051,7 @@ namespace GF2
             float now = Time.unscaledTime;
             if (now < _ikTargetNext) return;
             _ikTargetNext = now + 0.25f;
-            var line = new System.Text.StringBuilder("[GF2] ik target:");
+            var line = new System.Text.StringBuilder("[DollFrame] ik target:");
             AppendTargetSide(line, "L", 0);
             AppendTargetSide(line, "R", 1);
             Plugin.Log.LogInfo(line.ToString());
@@ -1099,7 +1099,7 @@ namespace GF2
             cy /= cn;
             gy /= gn;
             _groundSamplesLeft--;
-            Plugin.Log.LogInfo($"[GF2] ground-check: char-toe {cy:0.###}m game-toe {gy:0.###}m delta {(cy - gy) * 100f:+0.#;-0.#}cm");
+            Plugin.Log.LogInfo($"[DollFrame] ground-check: char-toe {cy:0.###}m game-toe {gy:0.###}m delta {(cy - gy) * 100f:+0.#;-0.#}cm");
         }
 
 

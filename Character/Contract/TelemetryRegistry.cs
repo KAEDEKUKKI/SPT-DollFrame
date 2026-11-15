@@ -1,9 +1,9 @@
 using System;
 
-namespace GF2
+namespace DollFrame
 {
     /// <summary>
-    /// 一個 [GF2] log 行族的登記項（todo 13 的登記制資料單元）。
+    /// 一個 [DollFrame] log 行族的登記項（todo 13 的登記制資料單元）。
     /// Producer 為 grep 核實過的單一生產者；HarnessPin 是釘此行的
     /// harness 子命令（"—" = 無子命令釘點；failure 標記一律由 tools/check-log.sh 計數）；
     /// DocsLocus 是行族舉證的文件落點。
@@ -11,7 +11,7 @@ namespace GF2
     internal readonly struct TelemetryLine
     {
         public readonly string Kind;       // "family"（正常行族）或 "failure"（失敗標記）
-        public readonly string LineFamily; // log 上的字面前綴（含 [GF2] 後的第一段，逐字）
+        public readonly string LineFamily; // log 上的字面前綴（含 [DollFrame] 後的第一段，逐字）
         public readonly string Producer;   // grep 核實的單一生產者（類名＋格式函式）
         public readonly string HarnessPin; // harness 子命令 / check-log
         public readonly string DocsLocus;  // 文件落點
@@ -27,9 +27,9 @@ namespace GF2
     }
 
     /// <summary>
-    /// [GF2] 行族登記表（零行為；只在編譯期載體上列資料，不改任何生產者）。
+    /// [DollFrame] 行族登記表（零行為；只在編譯期載體上列資料，不改任何生產者）。
     /// log 契約「單一生產者、呼叫端不改格式」的機器可讀對映：每個行族在此有唯一登記。
-    /// 新增 [GF2] 行族 = 先實作生產者、再於此登記、再視需要補 harness 子命令／
+    /// 新增 [DollFrame] 行族 = 先實作生產者、再於此登記、再視需要補 harness 子命令／
     /// check-log fixture／README 疑難排解／AGENTS.md log contract（見 AGENTS.md 行族同步規則）。
     /// 2026-11-14 架構反轉重列：退役 grip:/fp arms attached/fp visibility:/armik:/armik-frame:/
     /// fp eye:/fp plane:/fit:/warn: weapon operating（次要動作與視角模塊刪除），新增 scale:
@@ -54,7 +54,7 @@ namespace GF2
         internal static readonly TelemetryLine[] Entries =
         {
             // ---- check-log 釘的 6 個固定前綴 ----
-            // grep: GameBones.cs（$"[GF2] contract: ..."，附屬行 contract skip 附於行尾）
+            // grep: GameBones.cs（$"[DollFrame] contract: ..."，附屬行 contract skip 附於行尾）
             new TelemetryLine("family", "contract:", "GameBones.ContractLine", "constants", "AGENTS.md log contract"),
             // grep: CharacterRig.cs Build 尾行（rig 統計行）
             new TelemetryLine("family", "rig: bones=", "CharacterRig.Build", "—", "AGENTS.md log contract"),
@@ -80,8 +80,8 @@ namespace GF2
             new TelemetryLine("family", "cache: idle", "PmxRuntime（idle LRU 保留）", "—", "AGENTS.md log contract"),
             // grep: CharacterRig.cs SetupArmRest（0.3.9 重寫：臂鏈 rest 校準 attach 一次性行：
             // cfg／兩側 ok/skip:reason＋ok 側 palm/ratio/len）＋CharacterRig.cs Drive/EmitIkTargetLine
-            // （節流 ≥0.25s 的 [GF2] ik target: 節流行，L/R token 僅在該側依驅動時輸出）——
-            // IK 行族雙形：attach 行 `[GF2] ik: ...`＋節流行 `[GF2] ik target: ...`
+            // （節流 ≥0.25s 的 [DollFrame] ik target: 節流行，L/R token 僅在該側依驅動時輸出）——
+            // IK 行族雙形：attach 行 `[DollFrame] ik: ...`＋節流行 `[DollFrame] ik target: ...`
             new TelemetryLine("family", "ik:", "CharacterRig.SetupArmRest（attach 一次性）＋CharacterRig.EmitIkTargetLine（每幀 target 節流）", "ik", "AGENTS.md log contract"),
             // grep: CharacterRig.cs Drive（parity 採樣行，每 attach 至多 3 行）
             new TelemetryLine("family", "pose-parity", "CharacterRig.Drive（parity 採樣行）", "—", "AGENTS.md log contract"),
@@ -96,11 +96,11 @@ namespace GF2
             // grep: Character/Patches.cs（0.3.10 藏身處 FP 身體動畫機復活翻轉資訊行）
             new TelemetryLine("family", "hideout body animator:", "Patches.PostHideoutSetPointOfView（狀態翻轉資訊行）", "—", "AGENTS.md log contract"),
 
-            // ---- 4 組失敗標記（僅計數於 [GF2] 生產行；由 check-log/fixture 計數）----
+            // ---- 4 組失敗標記（僅計數於 [DollFrame] 生產行；由 check-log/fixture 計數）----
             // grep: GameBones.cs（ContractLine 的附屬行）
             new TelemetryLine("failure", "contract skip:", "GameBones.ContractLine", "check-log", "check-log + README"),
             // grep: PmxRuntime.cs（throw "implausible bone count"）經 BodyReplacer
-            //（"body replace failed: <ex>"）帶出到 [GF2] 行上被 check-log 命中
+            //（"body replace failed: <ex>"）帶出到 [DollFrame] 行上被 check-log 命中
             new TelemetryLine("failure", "implausible", "BodyReplacer『body replace failed』← PmxRuntime throw", "check-log", "check-log + README"),
             // grep: BodyReplacer.cs（Root_Joint missing ＋ character package missing）；
             // 注意 GameBones 的 "game anchors unresolved" 行攜的是 unresolved 標記，非 missing

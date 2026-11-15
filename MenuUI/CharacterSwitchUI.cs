@@ -8,7 +8,7 @@ using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
 
-namespace GF2
+namespace DollFrame
 {
     /// <summary>
     /// 主選單「全般（Overall）」畫面的角色切換 UI：＜＞＋角色名按鈕列。
@@ -28,7 +28,7 @@ namespace GF2
                 if (!_typeFailLogged)
                 {
                     _typeFailLogged = true;
-                    Plugin.Log.LogWarning("[GF2] OverallScreen type not found; menu switch UI disabled (PageUp hotkey unaffected)");
+                    Plugin.Log.LogWarning("[DollFrame] OverallScreen type not found; menu switch UI disabled (PageUp hotkey unaffected)");
                 }
                 yield break;
             }
@@ -50,7 +50,7 @@ namespace GF2
             }
             catch (Exception e)
             {
-                Plugin.Log.LogWarning($"[GF2] switch UI patch failed: {e.Message}");
+                Plugin.Log.LogWarning($"[DollFrame] switch UI patch failed: {e.Message}");
             }
         }
     }
@@ -97,7 +97,7 @@ namespace GF2
             }
             catch (Exception e)
             {
-                Plugin.Log.LogWarning($"[GF2] switch UI build failed: {e.Message}");
+                Plugin.Log.LogWarning($"[DollFrame] switch UI build failed: {e.Message}");
             }
         }
 
@@ -124,7 +124,7 @@ namespace GF2
 
             _targetRT = ResolveTargetRectTransform();
 
-            var row = new GameObject("GF2_SwitchRow", typeof(RectTransform));
+            var row = new GameObject("DollFrame_SwitchRow", typeof(RectTransform));
             Transform parentT = _targetRT != null ? _targetRT : screenRT;
             row.transform.SetParent(parentT, false);
             var rt = (RectTransform)row.transform;
@@ -147,8 +147,8 @@ namespace GF2
             Stretch(_rowBLabel.rectTransform);
 
             float btnSize = 26f;
-            MakeButton(row.transform, "gf2prev", "＜", tmpFont, 0f, btnSize, () => Cycle(-1));
-            MakeButton(row.transform, "gf2next", "＞", tmpFont, 1f, btnSize, () => Cycle(1));
+            MakeButton(row.transform, "dollframeprev", "＜", tmpFont, 0f, btnSize, () => Cycle(-1));
+            MakeButton(row.transform, "dollframenext", "＞", tmpFont, 1f, btnSize, () => Cycle(1));
 
             _rowB = row;
             UpdatePosition();
@@ -259,7 +259,7 @@ namespace GF2
         {
             if (Plugin.Character == null || Plugin.Character.Value == name) return;
             Plugin.Character.Value = name;
-            Plugin.Log.LogInfo($"[GF2] menu switch -> '{name}'");
+            Plugin.Log.LogInfo($"[DollFrame] menu switch -> '{name}'");
             _lastApplied = name ?? string.Empty;
             RefreshRowBLabel();
             Plugin.NotifyCharacterChanged();
@@ -269,7 +269,7 @@ namespace GF2
         {
             if (Plugin.Character != null) _lastApplied = Plugin.Character.Value ?? string.Empty;
             if (_rowBLabel != null)
-                _rowBLabel.text = $"GF2 角色：{(Plugin.Character != null ? Plugin.Character.Value : "-")}";
+                _rowBLabel.text = $"DollFrame 角色：{(Plugin.Character != null ? Plugin.Character.Value : "-")}";
         }
     }
 }

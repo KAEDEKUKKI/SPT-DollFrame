@@ -3,7 +3,7 @@ using EFT;
 using HarmonyLib;
 using UnityEngine;
 
-namespace GF2
+namespace DollFrame
 {
     /// <summary>
     /// Capsule compensation. Unity's CharacterController ignores transform scale, so
@@ -28,6 +28,9 @@ namespace GF2
             new Dictionary<Collider, float>();
 
         private static Vector3 ScaledY(Vector3 c, float s) => new Vector3(c.x, c.y * s, c.z);
+
+        private static Vector3 ScaledYWithSkin(Vector3 c, float s, float skinWidth) =>
+            new Vector3(c.x, (c.y - skinWidth) * s + skinWidth, c.z);
 
         private static void SetControllerCapsule(CharacterController cc, Vector3 center, float radius, float height)
         {
@@ -62,6 +65,7 @@ namespace GF2
         /// <summary>Live toggle entry: applies or resets capsule scale for a player.</summary>
         internal static void ApplyScale(Player player, float s)
         {
+            if (player is HideoutPlayer) return;
             if (!Plugin.CapsuleScaleEnabled.Value) return;
             if (player.CharacterController is PlayerCharacterController pcc)
             {
@@ -86,7 +90,7 @@ namespace GF2
                     VanillaHeight[cc] = cc.height;
                 }
                 else UnityScale[cc] = s;
-                SetControllerCapsule(cc, ScaledY(VanillaCenter[cc], s), VanillaRadius[cc] * s, VanillaHeight[cc] * s);
+                SetControllerCapsule(cc, ScaledYWithSkin(VanillaCenter[cc], s, cc.skinWidth), VanillaRadius[cc] * s, VanillaHeight[cc] * s);
                 Physics.SyncTransforms();
             }
             else if (player.CharacterController is SimpleCharacterController scc)
@@ -124,16 +128,17 @@ namespace GF2
         /// </summary>
         internal static void ApplyDerived(Player player, float fittedHeightM)
         {
+            if (player is HideoutPlayer) return;
             if (!Plugin.CapsuleScaleEnabled.Value) return;
             float multiplier = Plugin.HeightMultiplier.Value;
             if (multiplier <= 0f)
             {
-                Plugin.Log.LogWarning("[GF2] capsule: multiplier 0 -> vanilla");
+                Plugin.Log.LogWarning("[DollFrame] capsule: multiplier 0 -> vanilla");
                 return;
             }
             float factor = (fittedHeightM * multiplier) / 1.83f;
             ApplyScale(player, factor);
-            Plugin.Log.LogInfo($"[GF2] capsule: height {fittedHeightM:0.###}m x{factor:0.###} (derived)");
+            Plugin.Log.LogInfo($"[DollFrame] capsule: height {fittedHeightM:0.###}m x{factor:0.###} (derived)");
         }
 
         [HarmonyPostfix]
@@ -151,7 +156,7 @@ namespace GF2
         {
             var cc = __instance._characterController;
             if (cc != null && UnityScale.TryGetValue(cc, out float s))
-                cc.center = ScaledY(value, s);
+                cc.center = ScaledYWithSkin(value, s, cc.skinWidth);
         }
 
         [HarmonyPostfix]

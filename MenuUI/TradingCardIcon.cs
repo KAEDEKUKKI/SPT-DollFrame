@@ -12,20 +12,20 @@ using UnityEngine;
 using UnityEngine.UI;
 using PlayerIcons;
 
-namespace GF2
+namespace DollFrame
 {
     /// <summary>
     /// 跳蚤市場卡片頭像替換（TradingPlayerPanel，"You in trading" 那張卡）。
     /// 反編譯實證（Assembly-CSharp 0.16.9.5）：原版路徑 PlayerIcons.PlayerIconImage
     /// .SetPresetIcon(Profile) → PlayerIconCreator.GetIcon → PlayerIconCreatorModelView
     /// 自行 Instantiate "menuplayer.bundle"＋直接 PlayerBody.Init（不經 Player.InitVisuals、
-    /// 不經 EFT.UI.PlayerModelView——GF2 的兩個 hook 都管不到）；成品 sprite 存進記憶體 hash
+    /// 不經 EFT.UI.PlayerModelView——DollFrame 的兩個 hook 都管不到）；成品 sprite 存進記憶體 hash
     /// cache 與磁碟 PlayerIcons cache（跨 session 重用）→ 卡片頭像永遠是預設 PMC。
     /// 該 overload 的唯一外部呼叫點就是這張卡（反編譯全庫僅 TradingPlayerPanel.Set 呼叫）。
     /// 修法：prefix 直接覆寫整個呼叫（回傳 false，原版 icon 流程完全隔離），卡片頭像先空白，
     /// 再以 PlayerModelLoader（選單 preview 同款載入路徑、共用 PmxAssets cache）起一次性渲染：
     /// Root_Joint 下建獨立 rig（CharacterRig，模型側等比縮放）、裝備走 EquipmentHide 的資料級
-    /// 快照（Init prefix 已清空武器與指定槽位），CardIconDriver 常駐補隱非 GF2_ renderers
+    /// 快照（Init prefix 已清空武器與指定槽位），CardIconDriver 常駐補隱非 DollFrame_ renderers
     /// （watch／LOD 換裝／遲生成件），2 幀穩定後 rig.Drive()＋BSG 自家 icon 相機
     /// （PlayerIconCreator/PlayerIconCamera prefab＋PlayerIconCreatorSettings 構圖，取不到
     /// 才落回自有 fallback）拍 ARGB RenderTexture 成 sprite。sprite 以 .gfc 路徑為鍵做靜態
@@ -57,7 +57,7 @@ namespace GF2
                 if (!_typeFailLogged)
                 {
                     _typeFailLogged = true;
-                    Plugin.Log.LogWarning("[GF2] PlayerIconImage type not found; trading card icon hook disabled");
+                    Plugin.Log.LogWarning("[DollFrame] PlayerIconImage type not found; trading card icon hook disabled");
                 }
                 yield break;
             }
@@ -67,7 +67,7 @@ namespace GF2
                 if (!_typeFailLogged)
                 {
                     _typeFailLogged = true;
-                    Plugin.Log.LogWarning("[GF2] PlayerIconImage.SetPresetIcon(Profile) not found; trading card icon hook disabled");
+                    Plugin.Log.LogWarning("[DollFrame] PlayerIconImage.SetPresetIcon(Profile) not found; trading card icon hook disabled");
                 }
                 yield break;
             }
@@ -88,7 +88,7 @@ namespace GF2
                 if (!_warned)
                 {
                     _warned = true;
-                    Plugin.Log.LogWarning("[GF2] card icon: no character package selected - vanilla PMC card kept");
+                    Plugin.Log.LogWarning("[DollFrame] card icon: no character package selected - vanilla PMC card kept");
                 }
                 return true;                                 // 沒角色可掛 → 原版卡片
             }
@@ -118,7 +118,7 @@ namespace GF2
             try
             {
                 var sw = Stopwatch.StartNew();
-                host = new GameObject("GF2_card_icon_host");
+                host = new GameObject("DollFrame_card_icon_host");
                 loader = new PlayerModelLoader();
                 // BSG 的 icon layer（與 PlayerIconCreatorModelView.Show 相同）；NameToLayer
                 // 取不到（層名缺失）時退 0，camera mask 仍以 rootJoint 事後的實際 layer 推導
@@ -165,7 +165,7 @@ namespace GF2
                 if (!_warned)
                 {
                     _warned = true;
-                    Plugin.Log.LogWarning($"[GF2] card icon: render failed ({e.GetType().Name}) - card stays blank this session");
+                    Plugin.Log.LogWarning($"[DollFrame] card icon: render failed ({e.GetType().Name}) - card stays blank this session");
                 }
                 if (_cache.TryGetValue(pkgPath, out var cached))
                 {
@@ -182,7 +182,7 @@ namespace GF2
             if (!_warned)
             {
                 _warned = true;
-                Plugin.Log.LogWarning($"[GF2] card icon: teardown skipped ({e.GetType().Name})");
+                Plugin.Log.LogWarning($"[DollFrame] card icon: teardown skipped ({e.GetType().Name})");
             }
         }
 
@@ -196,7 +196,7 @@ namespace GF2
         }
 
         /// <summary>
-        /// 卡片渲染常駐 driver：掛在 host 上、隨 host 銷毀。每個 LateUpdate 補隱非 GF2_
+        /// 卡片渲染常駐 driver：掛在 host 上、隨 host 銷毀。每個 LateUpdate 補隱非 DollFrame_
         /// renderers（watch／LOD 換裝／裝備 view 等遲生成件；未隱藏槽位 view＝顯性放行），
         /// SettleFrames 幀穩定後 rig.Drive()→相機捕捉→sprite 快取與指派→一次性收尾
         /// （PmxAssets release／loader.Clear／host 銷毀）後自毀。
@@ -256,7 +256,7 @@ namespace GF2
                     if (!TradingCardIcon._warned)
                     {
                         TradingCardIcon._warned = true;
-                        Plugin.Log.LogWarning($"[GF2] card icon: capture failed ({e.GetType().Name}) - card stays blank this session");
+                        Plugin.Log.LogWarning($"[DollFrame] card icon: capture failed ({e.GetType().Name}) - card stays blank this session");
                     }
                     if (_preview != null && TradingCardIcon._cache.TryGetValue(_pkgPath, out var cached))
                     {
@@ -269,19 +269,19 @@ namespace GF2
 
             private void FinalizeCapture()
             {
-                // 捕捉前審計：殘餘啟用中的非 GF2_ renderer 就地現形（最多點名 3 個 GO）
+                // 捕捉前審計：殘餘啟用中的非 DollFrame_ renderer 就地現形（最多點名 3 個 GO）
                 var stray = new List<string>();
                 int strayCount = 0, total = 0;
                 foreach (var r in _modelGo.GetComponentsInChildren<Renderer>(true))
                 {
                     if (r == null) continue;
                     total++;
-                    if (!r.enabled || TradingCardIcon.UnderPrefix(r.transform, "GF2_")) continue;
+                    if (!r.enabled || TradingCardIcon.UnderPrefix(r.transform, "DollFrame_")) continue;
                     strayCount++;
                     if (stray.Count < 3) stray.Add($"{r.gameObject.name}({r.GetType().Name})");
                 }
                 if (strayCount > 0)
-                    Plugin.Log.LogInfo($"[GF2] card icon: pre-capture audit renderers={total} strayEnabled={strayCount} e.g. {string.Join(", ", stray)}");
+                    Plugin.Log.LogInfo($"[DollFrame] card icon: pre-capture audit renderers={total} strayEnabled={strayCount} e.g. {string.Join(", ", stray)}");
 
                 _rig.Drive();                                 // 與捕捉同一同步區塊，姿勢一致
                 var tex = Capture(_rootJoint, _games, _rig, _host, _settings);
@@ -313,7 +313,7 @@ namespace GF2
                     _preview.enabled = true;
                 }
                 _sw.Stop();
-                Plugin.Log.LogInfo($"[GF2] card icon: rendered '{_pkgName}' {tex.width}x{tex.height} in {_sw.Elapsed.TotalMilliseconds:0.##}ms ({(_warm ? "warm" : "cold")})\n{GameBones.ContractLine(_contract)}");
+                Plugin.Log.LogInfo($"[DollFrame] card icon: rendered '{_pkgName}' {tex.width}x{tex.height} in {_sw.Elapsed.TotalMilliseconds:0.##}ms ({(_warm ? "warm" : "cold")})\n{GameBones.ContractLine(_contract)}");
                 Finish();
             }
 
@@ -360,7 +360,7 @@ namespace GF2
             bool own = cam == null;
             if (own)
             {
-                var camGo = new GameObject("GF2_card_icon_cam", typeof(Camera));
+                var camGo = new GameObject("DollFrame_card_icon_cam", typeof(Camera));
                 camGo.transform.SetParent(host.transform, false);
                 cam = camGo.GetComponent<Camera>();
                 cam.fieldOfView = 25f;
@@ -418,25 +418,25 @@ namespace GF2
                 if (t.name != "Root_Joint") continue;
                 bool replaced = false;
                 for (int c = 0; c < t.childCount; c++)
-                    if (t.GetChild(c).name != null && t.GetChild(c).name.StartsWith("GF2_")) { replaced = true; break; }
+                    if (t.GetChild(c).name != null && t.GetChild(c).name.StartsWith("DollFrame_")) { replaced = true; break; }
                 if (!replaced) return t;
             }
             return null;
         }
 
         /// <summary>
-        /// 每幀補隱：除 GF2_ rig 與未設隱藏之裝備槽 view（現行預設僅 Eyewear 可留；該槽位經
+        /// 每幀補隱：除 DollFrame_ rig 與未設隱藏之裝備槽 view（現行預設僅 Eyewear 可留；該槽位經
         /// 資料級快照保留，顯性放行其 renderers）外，body 子樹內一切 renderer（PMC 蒙皮、
         /// 武器、BottomShadow、遲生成的 watch／LOD 件）全部隱藏。戰局側裝備隱藏隨
-        /// EFT.Transmog-cust 移除已由 GF2 承接（EquipmentHide）。
+        /// EFT.Transmog-cust 移除已由 DollFrame 承接（EquipmentHide）。
         /// </summary>
         private static void HideCardSurfaces(GameObject bodyGo, EFT.PlayerBody body)
         {
             var keep = new HashSet<Renderer>();
             var views = body != null ? body.SlotViews : null;
-            foreach (var slot in GF2.Visibility.EquipmentSlotHider.VisualSlots)
+            foreach (var slot in DollFrame.Visibility.EquipmentSlotHider.VisualSlots)
             {
-                if (GF2.Visibility.EquipmentSlotHider.ShouldHide(slot)) continue;      // 已被快照清空，不會生成 view
+                if (DollFrame.Visibility.EquipmentSlotHider.ShouldHide(slot)) continue;      // 已被快照清空，不會生成 view
                 GameObject model = null;
                 try
                 {
@@ -454,7 +454,7 @@ namespace GF2
             foreach (var r in bodyGo.GetComponentsInChildren<Renderer>(true))
             {
                 if (r == null) continue;
-                if (UnderPrefix(r.transform, "GF2_")) continue;
+                if (UnderPrefix(r.transform, "DollFrame_")) continue;
                 if (keep.Contains(r)) continue;
                 if (r.enabled) r.enabled = false;
                 if (r.shadowCastingMode != UnityEngine.Rendering.ShadowCastingMode.Off)

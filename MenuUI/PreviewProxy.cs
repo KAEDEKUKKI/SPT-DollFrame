@@ -7,7 +7,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using System.Reflection;
 
-namespace GF2
+namespace DollFrame
 {
     /// <summary>
     /// 主畫面角色預覽替換：攔截 PlayerModelView.Show，偵測選單生成的 PMC 預覽骨架
@@ -31,7 +31,7 @@ namespace GF2
                 if (!_typeFailLogged)
                 {
                     _typeFailLogged = true;
-                    Plugin.Log.LogWarning("[GF2] PlayerModelView type not found; menu preview hook disabled");
+                    Plugin.Log.LogWarning("[DollFrame] PlayerModelView type not found; menu preview hook disabled");
                 }
                 yield break;
             }
@@ -94,7 +94,7 @@ namespace GF2
         private CharacterRig _rig;
         private Transform _skeleton;
         private HashSet<Renderer> _hidden = new HashSet<Renderer>();
-        private readonly GF2.Visibility.EquipmentSlotHider _equipHider = new GF2.Visibility.EquipmentSlotHider();
+        private readonly DollFrame.Visibility.EquipmentSlotHider _equipHider = new DollFrame.Visibility.EquipmentSlotHider();
         private string _curPkg;
         private string _curPkgName;
         private float _nextScan;
@@ -186,14 +186,14 @@ namespace GF2
             if (_view == null) return;
             foreach (var smr in _view.GetComponentsInChildren<SkinnedMeshRenderer>(true))
             {
-                if (smr == null || (smr.name != null && smr.name.StartsWith("GF2_"))) continue;
+                if (smr == null || (smr.name != null && smr.name.StartsWith("DollFrame_"))) continue;
                 _hidden.Add(smr);
                 if (smr.enabled) smr.enabled = false;
                 smr.shadowCastingMode = ShadowCastingMode.Off;
             }
             foreach (var mr in _view.GetComponentsInChildren<MeshRenderer>(true))
             {
-                if (mr == null || (mr.name != null && mr.name.StartsWith("GF2_"))) continue;
+                if (mr == null || (mr.name != null && mr.name.StartsWith("DollFrame_"))) continue;
                 _hidden.Add(mr);
                 if (mr.enabled) mr.enabled = false;
                 mr.shadowCastingMode = ShadowCastingMode.Off;
@@ -222,9 +222,9 @@ namespace GF2
             {
                 // 壞套件等例外不上拋到 Show（選單不中斷）；章已蓋，既有重試節奏照舊。
                 // rig 已建成（Driving 後尾段 telemetry 例外）時不降級：降級會讓
-                // FindPreviewSkeleton 因 GF2_ 哨兵永遠找不到骨架 → 死鎖在無驅動的靜態 rig
+                // FindPreviewSkeleton 因 DollFrame_ 哨兵永遠找不到骨架 → 死鎖在無驅動的靜態 rig
                 if (_rig == null || _skin == null) _phase = Phase.Scan;
-                Plugin.Log.LogWarning($"[GF2-preview] immediate attach failed: {e.Message}");
+                Plugin.Log.LogWarning($"[DollFrame-preview] immediate attach failed: {e.Message}");
             }
         }
 
@@ -264,7 +264,7 @@ namespace GF2
                 {
                     // 與 AttachNow 同一容錯：壞套件等例外不讓 LateUpdate 中斷；章已蓋，
                     // 重試照舊（每次重試前不殘留半套 state——TryAttach 前段全部失敗即返回）
-                    Plugin.Log.LogWarning($"[GF2-preview] scan attach failed: {e.Message}");
+                    Plugin.Log.LogWarning($"[DollFrame-preview] scan attach failed: {e.Message}");
                 }
                 return;
             }
@@ -365,7 +365,7 @@ namespace GF2
                 if (!_pkgWarned)
                 {
                     _pkgWarned = true;
-                    Plugin.Log.LogWarning("[GF2-preview] no character package selected (Visual/Character)");
+                    Plugin.Log.LogWarning("[DollFrame-preview] no character package selected (Visual/Character)");
                 }
                 return;
             }
@@ -389,12 +389,12 @@ namespace GF2
                 out var pkgName, out var warm, out var preloadMs);
             if (assets == null)
             {
-                Plugin.Log.LogWarning($"[GF2-preview] package '{pkgName}' failed to load - retrying next scan");
+                Plugin.Log.LogWarning($"[DollFrame-preview] package '{pkgName}' failed to load - retrying next scan");
                 return;
             }
-            Plugin.Log.LogInfo($"[GF2] preload: {pkgName} {preloadMs:0.##}ms ({(warm ? "warm" : "cold")})");
+            Plugin.Log.LogInfo($"[DollFrame] preload: {pkgName} {preloadMs:0.##}ms ({(warm ? "warm" : "cold")})");
 
-            RemoveStrayGf2Children(skel);
+            RemoveStrayDollFrameChildren(skel);
 
             // independent rig on the preview skeleton (menu keeps no ground offset, as before)
             var menuMetrics = ModelMetrics.Compute(assets.Model, Plugin.PmxUnitScale.Value, menuDump);
@@ -420,7 +420,7 @@ namespace GF2
             // menu-vs-raid factor parity (todo 25): the 12 logical factors of THIS menu
             // rig vs the raid rig of the same package (captured once per attach);
             // divergence >2% warns, no raid yet logs no baseline - never fatal.
-            var attachLog = $"[GF2] preview body replaced: {pkgName}\n{GameBones.ContractLine(contract)}";
+            var attachLog = $"[DollFrame] preview body replaced: {pkgName}\n{GameBones.ContractLine(contract)}";
             var menuFactors = menuMetrics.Factors;
             BodyReplacer.LastFactorsByPackage.TryGetValue(pkgName, out var raidFactors);
             var parity = GameBones.ParityLine(pkgName, menuFactors, raidFactors);
@@ -445,8 +445,8 @@ namespace GF2
                 foreach (var t in liveModelRoot.GetComponentsInChildren<Transform>(true))
                 {
                     if (t == null || t.name != "Root_Joint") continue;
-                    if (UnderGf2Ancestor(t) || !GameBones.HasAllRequiredAnchors(t)) continue;
-                    RemoveStrayGf2Children(t);
+                    if (UnderDollFrameAncestor(t) || !GameBones.HasAllRequiredAnchors(t)) continue;
+                    RemoveStrayDollFrameChildren(t);
                     return t;
                 }
                 return null;
@@ -457,8 +457,8 @@ namespace GF2
                 foreach (var t in _view.GetComponentsInChildren<Transform>(true))
                 {
                     if (t == null || t.name != "Root_Joint") continue;
-                    if (UnderGf2Ancestor(t) || !GameBones.HasAllRequiredAnchors(t)) continue;
-                    RemoveStrayGf2Children(t);
+                    if (UnderDollFrameAncestor(t) || !GameBones.HasAllRequiredAnchors(t)) continue;
+                    RemoveStrayDollFrameChildren(t);
                     return t;
                 }
             }
@@ -472,22 +472,22 @@ namespace GF2
                 if (ownerView != null && ownerView != _view) continue;
                 bool replaced = false;
                 for (int c = 0; c < t.childCount; c++)
-                    if (t.GetChild(c).name.StartsWith("GF2_")) { replaced = true; break; }
-                // GF2_ 祖先（TradingCardIcon 的 GF2_card_icon_host 等）與缺漏錨點的非完整骨架永不接手
-                if (replaced || UnderGf2Ancestor(t) || !GameBones.HasAllRequiredAnchors(t)) continue;
+                    if (t.GetChild(c).name.StartsWith("DollFrame_")) { replaced = true; break; }
+                // DollFrame_ 祖先（TradingCardIcon 的 DollFrame_card_icon_host 等）與缺漏錨點的非完整骨架永不接手
+                if (replaced || UnderDollFrameAncestor(t) || !GameBones.HasAllRequiredAnchors(t)) continue;
                 return t;
             }
             return null;
         }
 
-        private void RemoveStrayGf2Children(Transform rootJoint)
+        private void RemoveStrayDollFrameChildren(Transform rootJoint)
         {
             if (rootJoint == null) return;
             for (int i = rootJoint.childCount - 1; i >= 0; i--)
             {
                 var c = rootJoint.GetChild(i);
                 if (c == null || (_skin != null && c == _skin.transform)) continue;
-                if (c.name != null && c.name.StartsWith("GF2_", StringComparison.Ordinal))
+                if (c.name != null && c.name.StartsWith("DollFrame_", StringComparison.Ordinal))
                 {
                     var smr = c.GetComponent<SkinnedMeshRenderer>();
                     if (smr != null && smr.sharedMesh != null) DestroyImmediate(smr.sharedMesh);
@@ -497,12 +497,12 @@ namespace GF2
             }
         }
 
-        private static bool UnderGf2Ancestor(Transform t)
+        private static bool UnderDollFrameAncestor(Transform t)
         {
             var cur = t;
             while (cur != null)
             {
-                if (cur.name != null && cur.name.StartsWith("GF2_", StringComparison.Ordinal)) return true;
+                if (cur.name != null && cur.name.StartsWith("DollFrame_", StringComparison.Ordinal)) return true;
                 cur = cur.parent;
             }
             return false;
@@ -529,7 +529,7 @@ namespace GF2
             {
                 if (smr == null || _hidden.Contains(smr)) continue;
                 if (!IsSkinnedTo(smr, skel)) continue;
-                if (UnderPrefix(smr.transform, "GF2_", skel)) continue;
+                if (UnderPrefix(smr.transform, "DollFrame_", skel)) continue;
                 _hidden.Add(smr);
                 smr.enabled = false;
                 smr.shadowCastingMode = ShadowCastingMode.Off;
@@ -577,7 +577,7 @@ namespace GF2
             {
                 foreach (var r in view.GetComponentsInChildren<Renderer>(true))
                 {
-                    if (r == null || (r.name != null && r.name.StartsWith("GF2_"))) continue;
+                    if (r == null || (r.name != null && r.name.StartsWith("DollFrame_"))) continue;
                     r.enabled = true;
                     r.shadowCastingMode = ShadowCastingMode.On;
                 }
@@ -616,12 +616,12 @@ namespace GF2
             }
             catch (Exception e)
             {
-                Plugin.Log.LogWarning($"[GF2-preview] reload preview failed: {e.Message}");
+                Plugin.Log.LogWarning($"[DollFrame-preview] reload preview failed: {e.Message}");
             }
         }
 
         /// <summary>拆除：還原隱藏的蒙皮、刪除 rig（根 GO 含整棵 Transform 樹與 SMR）與其 mesh 複本、回到掃描狀態。可重入。
-        /// 用 DestroyImmediate：同一幀內的「拆＋同幀重掛」必須對 FindPreviewSkeleton 的 GF2_ 哨兵立即可見，
+        /// 用 DestroyImmediate：同一幀內的「拆＋同幀重掛」必須對 FindPreviewSkeleton 的 DollFrame_ 哨兵立即可見，
         /// 否則 deferred Destroy 會把同幀重掃擋到 +0.5s 迴圈——期間 global fallback 可能抓到卡片 icon host 的
         /// Root_Joint（跨骨架附掛＝預覽位無模型）。選 Vanilla (PMC) 時同步還原被隱藏的原版蒙皮。</summary>
         private void Teardown(string reason)
@@ -650,7 +650,7 @@ namespace GF2
             _curPkg = null;
             _phase = Phase.Scan;
             _nextScan = 0f;
-            if (had) Plugin.Log.LogInfo($"[GF2] preview body removed ({reason})");
+            if (had) Plugin.Log.LogInfo($"[DollFrame] preview body removed ({reason})");
         }
 
         private void OnDestroy()

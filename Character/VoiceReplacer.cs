@@ -1,17 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.IO.Compression;
 using System.Runtime.CompilerServices;
 using EFT;
 using HarmonyLib;
 using UnityEngine;
 
-namespace GF2
+namespace DollFrame
 {
     /// <summary>
     /// 玩家角色語音自動替換器：
-    /// 依目前選擇的角色套件（Plugin.Character）自動匹配 GF2_Voices/&lt;角色家族&gt;/ 下的
+    /// 依目前選擇的角色套件（Plugin.Character）自動匹配 DollFrame_Voices/&lt;角色家族&gt;/ 下的
     /// 各 EPhraseTrigger 資料夾（.wav），於玩家掛載／切換角色／BaseSpeaker.Init 時
     /// 替換 player.Speaker.PhrasesBanks 的 AudioClip；切回 Vanilla (PMC) 時完整還原原版語音。
     /// </summary>
@@ -19,7 +18,7 @@ namespace GF2
     internal static class VoiceReplacer
     {
         internal static readonly string VoicesDirectory = Path.Combine(
-            Path.GetDirectoryName(typeof(Plugin).Assembly.Location), "GF2_Voices");
+            Path.GetDirectoryName(typeof(Plugin).Assembly.Location), "Voices");
 
         private static readonly ConditionalWeakTable<BaseSpeaker, Dictionary<TagBank, (AudioClip[] clips, float[] lengths)>>
             OriginalSnapshots = new ConditionalWeakTable<BaseSpeaker, Dictionary<TagBank, (AudioClip[], float[])>>();
@@ -27,7 +26,7 @@ namespace GF2
         private static readonly Dictionary<string, string[]> TriggerAliases =
             new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
             {
-                // .gf2v banks.txt 以 USEC TagBank 資產名提取；BEAR 等不同命名語音包需透過 EPhraseTrigger 別名匹配
+                // 語音包多以 USEC TagBank 資產名分類；BEAR 等不同命名語音包需透過 EPhraseTrigger 別名匹配
                 { "OnFight", new[] { "Fight", "OnEnemyConversation", "OnFirstContact" } },
                 { "OnMutter", new[] { "Mutter", "OnBreath" } },
                 { "HandBroken", new[] { "BrokenHand" } },
@@ -93,7 +92,7 @@ namespace GF2
             }
             catch (Exception e)
             {
-                Plugin.Log.LogWarning($"[GF2] voice {caller} failed: {e.Message}");
+                Plugin.Log.LogWarning($"[DollFrame] voice {caller} failed: {e.Message}");
             }
         }
 
@@ -117,7 +116,7 @@ namespace GF2
                 if (!string.IsNullOrEmpty(pkgName) && _lastMissingWarnFamily != pkgName)
                 {
                     _lastMissingWarnFamily = pkgName;
-                    Plugin.Log.LogInfo($"[GF2] voice: no GF2_Voices pack for '{pkgName}', keeping vanilla voice");
+                    Plugin.Log.LogInfo($"[DollFrame] voice: no Voices pack for '{pkgName}', keeping vanilla voice");
                 }
                 return;
             }
@@ -157,7 +156,7 @@ namespace GF2
             }
 
             string unmatchedInfo = unmatched != null ? $" (unmatched={unmatched.Count}: {string.Join(",", unmatched)})" : string.Empty;
-            Plugin.Log.LogInfo($"[GF2] voice: applied '{family}' ({replacedBanks} banks, {replacedClips} clip slots){unmatchedInfo}");
+            Plugin.Log.LogInfo($"[DollFrame] voice: applied '{family}' ({replacedBanks} banks, {replacedClips} clip slots){unmatchedInfo}");
         }
 
         private static AudioClip[] ResolveBankClips(Dictionary<string, AudioClip[]> bankMap, EPhraseTrigger trigger, TagBank bank)
@@ -201,7 +200,7 @@ namespace GF2
                 restored++;
             }
             if (restored > 0)
-                Plugin.Log.LogInfo($"[GF2] voice: restored vanilla ({restored} banks)");
+                Plugin.Log.LogInfo($"[DollFrame] voice: restored vanilla ({restored} banks)");
         }
 
         private static void SnapshotOriginals(BaseSpeaker speaker)
@@ -227,7 +226,7 @@ namespace GF2
             OriginalSnapshots.Add(speaker, snap);
         }
 
-        private static readonly string[] VoiceFolderNames = { "Voices", "GF2_Voices" };
+        private static readonly string[] VoiceFolderNames = { "Voices", "DollFrame_Voices" };
 
         private static IEnumerable<string> GetVoiceDirectories()
         {
@@ -263,20 +262,8 @@ namespace GF2
             int bestLen = 0;
             foreach (var voiceRoot in GetVoiceDirectories())
             {
-                var exactArch = Path.Combine(voiceRoot, pkgName + ".gf2v");
-                if (File.Exists(exactArch)) return exactArch;
                 var exactDir = Path.Combine(voiceRoot, pkgName);
                 if (Directory.Exists(exactDir)) return exactDir;
-
-                foreach (var f in Directory.GetFiles(voiceRoot, "*.gf2v"))
-                {
-                    var name = Path.GetFileNameWithoutExtension(f);
-                    if (!string.IsNullOrEmpty(name) && pkgName.StartsWith(name, StringComparison.Ordinal) && name.Length > bestLen)
-                    {
-                        best = f;
-                        bestLen = name.Length;
-                    }
-                }
 
                 foreach (var dir in Directory.GetDirectories(voiceRoot))
                 {
@@ -297,58 +284,10 @@ namespace GF2
                 return _cachedClips;
 
             ClearCache();
-            var map = voiceSource.EndsWith(".gf2v", StringComparison.OrdinalIgnoreCase)
-                ? LoadArchive(family, voiceSource)
-                : LoadDirectory(family, voiceSource);
+            var map = LoadDirectory(family, voiceSource);
 
             _cachedFamily = family;
             _cachedClips = map;
-            return map;
-        }
-
-        private static Dictionary<string, AudioClip[]> LoadArchive(string family, string archivePath)
-        {
-            var map = new Dictionary<string, AudioClip[]>(StringComparer.OrdinalIgnoreCase);
-            using var fs = File.OpenRead(archivePath);
-            using var zip = new ZipArchive(fs, ZipArchiveMode.Read);
-
-            var clipsByName = new Dictionary<string, AudioClip>(StringComparer.OrdinalIgnoreCase);
-            foreach (var entry in zip.Entries)
-            {
-                if (!entry.FullName.StartsWith("clips/", StringComparison.OrdinalIgnoreCase) ||
-                    !entry.FullName.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
-                    continue;
-
-                var cname = entry.FullName.Substring("clips/".Length);
-                using var es = entry.Open();
-                using var ms = new MemoryStream((int)entry.Length);
-                es.CopyTo(ms);
-                var clip = LoadWavBytes(ms.ToArray(), $"GF2_{family}_{Path.GetFileNameWithoutExtension(cname)}");
-                if (clip != null) clipsByName[cname] = clip;
-            }
-
-            var banksEntry = zip.GetEntry("banks.txt");
-            if (banksEntry != null)
-            {
-                using var sr = new StreamReader(banksEntry.Open(), System.Text.Encoding.UTF8);
-                string line;
-                while ((line = sr.ReadLine()) != null)
-                {
-                    int tab = line.IndexOf('\t');
-                    if (tab <= 0) continue;
-                    string bankName = line.Substring(0, tab);
-                    string rest = line.Substring(tab + 1);
-                    if (string.IsNullOrEmpty(rest)) continue;
-                    var parts = rest.Split('|');
-                    var list = new List<AudioClip>(parts.Length);
-                    foreach (var p in parts)
-                    {
-                        if (clipsByName.TryGetValue(p, out var clip) && clip != null)
-                            list.Add(clip);
-                    }
-                    if (list.Count > 0) map[bankName] = list.ToArray();
-                }
-            }
             return map;
         }
 
@@ -364,7 +303,7 @@ namespace GF2
                 var list = new List<AudioClip>(files.Length);
                 foreach (var f in files)
                 {
-                    var clip = LoadWavBytes(File.ReadAllBytes(f), $"GF2_{family}_{bankName}_{Path.GetFileNameWithoutExtension(f)}");
+                    var clip = LoadWavBytes(File.ReadAllBytes(f), $"DollFrame_{family}_{bankName}_{Path.GetFileNameWithoutExtension(f)}");
                     if (clip != null) list.Add(clip);
                 }
                 if (list.Count > 0) map[bankName] = list.ToArray();
@@ -458,7 +397,7 @@ namespace GF2
             }
             catch (Exception e)
             {
-                Plugin.Log.LogWarning($"[GF2] voice wav load failed '{clipName}': {e.Message}");
+                Plugin.Log.LogWarning($"[DollFrame] voice wav load failed '{clipName}': {e.Message}");
                 return null;
             }
         }

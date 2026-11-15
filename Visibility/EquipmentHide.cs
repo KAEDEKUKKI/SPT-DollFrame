@@ -5,14 +5,14 @@ using EFT.InventoryLogic;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace GF2.Visibility
+namespace DollFrame.Visibility
 {
     /// <summary>
     /// 【Visibility 次要連動 2B：自身裝備槽位渲染器隱藏器】
     /// 直接針對目標玩家（僅自身或主選單預覽）的 PlayerBody.SlotViews 切換 Renderer 可見性，
     /// 不再修改 InventoryEquipment 快照，徹底解決：
     /// 1) 全地圖 AI/Scav/隊友裝備被誤隱藏的 bug；
-    /// 2) GF2 ↔ Vanilla (PMC) 切換時需重載 PlayerModelView 的卡頓與脫光閃爍。
+    /// 2) DollFrame ↔ Vanilla (PMC) 切換時需重載 PlayerModelView 的卡頓與脫光閃爍。
     /// </summary>
     internal sealed class EquipmentSlotHider
     {
@@ -134,7 +134,7 @@ namespace GF2.Visibility
             if (go == null) return;
             foreach (var r in go.GetComponentsInChildren<Renderer>(true))
             {
-                if (r != null && (r.name == null || !r.name.StartsWith("GF2_", StringComparison.Ordinal)))
+                if (r != null && (r.name == null || !r.name.StartsWith("DollFrame_", StringComparison.Ordinal)))
                     into.Add(r);
             }
         }

@@ -3,7 +3,7 @@ using System.Reflection;
 using EFT;
 using UnityEngine;
 
-namespace GF2
+namespace DollFrame
 {
     /// <summary>Force Final IK solvers to re-cache limb data on the fitted transforms.</summary>
     internal static class IkRefresh
@@ -19,7 +19,7 @@ namespace GF2
             }
             catch (Exception e)
             {
-                Plugin.Log.LogWarning($"[GF2] IK refresh failed (non-fatal): {e.Message}");
+                Plugin.Log.LogWarning($"[DollFrame] IK refresh failed (non-fatal): {e.Message}");
             }
         }
 
@@ -31,7 +31,7 @@ namespace GF2
             var f = FieldOf(player, name);
             if (f == null)
             {
-                Plugin.Log.LogWarning($"[GF2] IK refresh: solver field '{name}' not found (non-fatal)");
+                Plugin.Log.LogWarning($"[DollFrame] IK refresh: solver field '{name}' not found (non-fatal)");
                 return null;
             }
             return f.GetValue(player) as Behaviour;

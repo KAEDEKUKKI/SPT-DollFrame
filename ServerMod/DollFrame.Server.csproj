@@ -5,12 +5,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>DollFrame.Server</AssemblyName>
-    <Version>0.3.18</Version>
+    <Version>0.4.0</Version>
     <Description>SPT-DollFrame character and voice replacement framework companion.</Description>
-    <RootNamespace>GF2.Server</RootNamespace>
+    <RootNamespace>DollFrame.Server</RootNamespace>
     <!-- SPTarkov server root（DLL 引用與部屬目標；對齊 ORBIT.Server 的 SPT 4.1 參照集） -->
     <SPT_DIR Condition=" '$(SPT_DIR)' == '' ">C:\SPT\SPT</SPT_DIR>
-    <ModDeployDir>$(SPT_DIR)/user/mods/kukki.DollFrame</ModDeployDir>
+    <ModDeployDir>$(SPT_DIR)/user/mods/DollFrame</ModDeployDir>
   </PropertyGroup>
 
   <ItemGroup>
@@ -27,7 +27,7 @@
   <Target Name="DeployMod" AfterTargets="Build">
     <MakeDir Directories="$(ModDeployDir)" />
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ModDeployDir)" SkipUnchangedFiles="true" />
-    <Message Importance="high" Text="[GF2.Server] Deployed DLL to $(ModDeployDir)" />
+    <Message Importance="high" Text="[DollFrame.Server] Deployed DLL to $(ModDeployDir)" />
   </Target>
 
 </Project>

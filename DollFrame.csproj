@@ -2,9 +2,9 @@
 
   <PropertyGroup>
     <AssemblyName>DollFrame</AssemblyName>
-    <RootNamespace>GF2</RootNamespace>
+    <RootNamespace>DollFrame</RootNamespace>
     <TargetFramework>netstandard2.1</TargetFramework>
-    <Version>0.3.18</Version>
+    <Version>0.4.0</Version>
     <Description>Modular PMX character model, IK retargeting, PBR/SDF shader, and voice replacement framework for SPTarkov.</Description>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
@@ -16,16 +16,11 @@
   <Import Project="UserSettings.props" Condition="exists('UserSettings.props')" />
 
   <ItemGroup>
-    <Compile Remove="Packager/**" />
     <Compile Remove="Tests/**" />
     <Compile Remove="analysis/**" />
     <Compile Remove="bug/**" />
     <Compile Remove="ServerMod/**" />
     <Compile Remove="Shaders/**" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Compile Include="Packager/MeshSplitter.cs" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(SPTTarkovDirectory)'!=''">
@@ -51,8 +46,8 @@
   </ItemGroup>
 
   <Target Name="CopyOutput" AfterTargets="Build" Condition="'$(CopyOutputToBepInEx)'=='true'">
-    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(SPTTarkovDirectory)\BepInEx\plugins\kukki.DollFrame\" />
-    <Copy SourceFiles="Shaders\gf2_shaders.bundle" DestinationFolder="$(SPTTarkovDirectory)\BepInEx\plugins\kukki.DollFrame\" Condition="exists('Shaders\gf2_shaders.bundle')" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(SPTTarkovDirectory)\BepInEx\plugins\DollFrame\" />
+    <Copy SourceFiles="Shaders\dollframe_shaders.bundle" DestinationFolder="$(SPTTarkovDirectory)\BepInEx\plugins\DollFrame\" Condition="exists('Shaders\dollframe_shaders.bundle')" />
   </Target>
 
 </Project>

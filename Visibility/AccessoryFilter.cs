@@ -1,6 +1,6 @@
 using System;
 
-namespace GF2
+namespace DollFrame
 {
     /// <summary>
     /// 【Visibility 次要連動 2C：特殊建模自帶配件隱藏】
@@ -9,7 +9,7 @@ namespace GF2
     /// </summary>
     internal static class AccessoryFilter
     {
-#if !GF2_PMX_PARSER_ONLY
+#if !DOLLFRAME_PMX_PARSER_ONLY
         private static string _memoCsv;
         private static string[] _memoParsed;
 

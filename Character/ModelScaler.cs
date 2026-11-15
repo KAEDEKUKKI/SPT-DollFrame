@@ -4,14 +4,14 @@
 // 遊戲腿鏈——腳軌跡、接地與膠囊錨定零回歸。臂鏈個別縮放退役（2026-11-14-6）：肩 pivot 的鏈級
 // localScale 曾把手臂子樹（含手掌手指）相對軀幹放大 arm k 1.29–1.41 倍（原始比例包實測），
 // 即「手指與手臂被拉長」之根因，機制整組退役。零拉伸不變量改約為：縮放只發生在 Build 的 rig 根
-// 一次性 uniform 乘入；每幀仍僅寫 localRotation。純數學（ModelScaleMath）雙編譯進 Tests/Packager。
+// 一次性 uniform 乘入；每幀仍僅寫 localRotation。純數學（ModelScaleMath）雙編譯進 Tests。
 using System;
 using System.Collections.Generic;
-#if !GF2_PMX_PARSER_ONLY
+#if !DOLLFRAME_PMX_PARSER_ONLY
 using UnityEngine;
 #endif
 
-namespace GF2
+namespace DollFrame
 {
     /// <summary>
     /// 純數學權威（雙編譯）：由 ModelMetrics 12 段因子中的腿鏈群組推出「全模型單一等比縮放因子」k。
@@ -83,7 +83,7 @@ namespace GF2
         }
     }
 
-#if !GF2_PMX_PARSER_ONLY
+#if !DOLLFRAME_PMX_PARSER_ONLY
     /// <summary>Build 期一次性全模型等比縮放套用器（唯一合法的 localScale 寫入點）。</summary>
     internal static class ModelScaler
     {
@@ -100,7 +100,7 @@ namespace GF2
         internal static string ScaleLine(string pkgName, ModelScaleMath.ScalePlan plan, int roots)
         {
             var raw = plan.Clamped ? $" (raw {plan.Raw:0.####})" : "";
-            return $"[GF2] scale: pkg={pkgName} k={plan.K:0.####} root={roots}{raw}";
+            return $"[DollFrame] scale: pkg={pkgName} k={plan.K:0.####} root={roots}{raw}";
         }
     }
 #endif

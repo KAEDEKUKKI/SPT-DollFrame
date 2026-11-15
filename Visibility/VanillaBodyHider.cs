@@ -4,7 +4,7 @@ using EFT;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace GF2
+namespace DollFrame
 {
     /// <summary>
     /// 【Visibility 次要連動 2A：原版 PMC 素體與視角殘留部件隱藏器】
@@ -151,13 +151,13 @@ namespace GF2
                     if (!_bodyRestoreWarned)
                     {
                         _bodyRestoreWarned = true;
-                        Plugin.Log.LogWarning($"[GF2] warn: vanilla render restore failed ({ex.GetType().Name}: {ex.Message}) - body SMR restore enforcement continues");
+                        Plugin.Log.LogWarning($"[DollFrame] warn: vanilla render restore failed ({ex.GetType().Name}: {ex.Message}) - body SMR restore enforcement continues");
                     }
                 }
             }
             foreach (var r in player.GetComponentsInChildren<Renderer>(true))
             {
-                if (r == null || (r.name != null && r.name.StartsWith("GF2_"))) continue;
+                if (r == null || (r.name != null && r.name.StartsWith("DollFrame_"))) continue;
                 r.enabled = true;
                 if (r.shadowCastingMode == ShadowCastingMode.Off)
                     r.shadowCastingMode = ShadowCastingMode.On;
@@ -174,12 +174,12 @@ namespace GF2
 
         /// <summary>
         /// 判定第一人稱控制器下的 SkinnedMeshRenderer 是否屬於原版 PMC 身體部件（頭／衣／褲／手）。
-        /// GF2 自建網格與武器本體網格一律排除；空手武器（empty_hands）本體為 PMC 裸手網格，納入隱藏。
+        /// DollFrame 自建網格與武器本體網格一律排除；空手武器（empty_hands）本體為 PMC 裸手網格，納入隱藏。
         /// </summary>
         internal static bool IsViewmodelBodyPiece(SkinnedMeshRenderer r)
         {
             if (r == null) return false;
-            if (r.name != null && r.name.StartsWith("GF2_", StringComparison.Ordinal)) return false;
+            if (r.name != null && r.name.StartsWith("DollFrame_", StringComparison.Ordinal)) return false;
             if (UnderAncestorSnippet(r.transform, "empty_hands")) return true;
             if (ContainsToken(r.name) || ContainsToken(r.gameObject != null ? r.gameObject.name : null)) return false;
             if (r.bones == null || r.bones.Length == 0) return false;
@@ -245,7 +245,7 @@ namespace GF2
                 if (smr == null || !smr.enabled) continue;
                 if (handsRoot != null && smr.transform.IsChildOf(handsRoot)) continue;
                 if (UnderAncestorSnippet(smr.transform, "Weapon_root_anim")) continue;
-                if (smr.name == null || !smr.name.StartsWith("GF2_"))
+                if (smr.name == null || !smr.name.StartsWith("DollFrame_"))
                 {
                     bool isHuman = smr.rootBone != null && smr.rootBone.name != null && smr.rootBone.name.Contains("Base Human");
                     if (!isHuman && smr.bones != null)

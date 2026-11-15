@@ -2,15 +2,16 @@
 // 的 θ* 場＋coverage＋臉漫貼快照）與 per-rig SdfFaceDriver（臉材質實例＋貼圖副本，
 // 依頭骨基座×光向量得 ψ，對 coverage bbox 以 LUT 合成陰影到副本貼圖）。
 // 契約：θ* 與 ψ 共用同一臉基座（Face 材質頂點平均法線正規化＝F，R=cross(+Y,F) 正規化），
-// 與 tools/bake_sdf_face.py 的 encode/decode 完全對稱（R=(ψ*+π)/(2π)×255 → (k+0.5) 還原）；
+// 與 sdf_face.png 烘焙端（repo 外製作管線）的 encode/decode 完全對稱（R=(ψ*+π)/(2π)×255 → (k+0.5) 還原）；
 // mask = clamp01((outer − |wrap(ψ−θ*)|)/(2w))，帶寬 w=0.14rad。貼圖契約：臉副本 ≤1024；
 // 副本尺寸≠bake res 時以最近鄰映射（θ* 場為低頻，安全）。
 using System;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace GF2
+namespace DollFrame
 {
     /// <summary>包級 SDF 臉烘焙資料。</summary>
     internal sealed class SdfFaceAsset
@@ -106,7 +107,7 @@ namespace GF2
         {
             var tex = new Texture2D(a.CloneW, a.CloneH, TextureFormat.RGBA32, false, false)
             {
-                name = "GF2_sdf_face",
+                name = "DollFrame_sdf_face",
                 wrapMode = TextureWrapMode.Clamp,
                 hideFlags = HideFlags.DontUnloadUnusedAsset
             };
@@ -247,26 +248,41 @@ namespace GF2
             R.Normalize();
         }
 
+        private const int BakeSize = 512;
+
         internal static SdfFaceAsset Build(PmxParser.PmxModel pmx, Dictionary<string, byte[]> textureBytes,
-            int faceMatIdx, Vector3 faceF, Vector3 faceR)
+            int faceMatIdx, Vector3 faceF, Vector3 faceR, bool flipUv = true, string cacheDir = null)
         {
             var mat = pmx.Mats[faceMatIdx];
             if (mat.TexIdx < 0 || mat.TexIdx >= pmx.TexPaths.Length) return null;
             var rel = pmx.TexPaths[mat.TexIdx];
             var baseBytes = ResolveBytes(textureBytes, rel);
-            if (baseBytes == null || !textureBytes.TryGetValue(SdfFaceAsset.ContainerKey, out var sdfBytes))
-                return null;
+            if (baseBytes == null) return null;
+
+            Color32[] px = null;
+            int w = 0, h = 0;
             try
             {
-                var temp = new Texture2D(2, 2, TextureFormat.RGBA32, false, false);
-                if (!temp.LoadImage(sdfBytes, false))
+                if (textureBytes.TryGetValue(SdfFaceAsset.ContainerKey, out var sdfBytes))
                 {
+                    var temp = new Texture2D(2, 2, TextureFormat.RGBA32, false, false);
+                    if (!temp.LoadImage(sdfBytes, false))
+                    {
+                        UnityEngine.Object.Destroy(temp);
+                        return null;
+                    }
+                    px = temp.GetPixels32();
+                    w = temp.width;
+                    h = temp.height;
                     UnityEngine.Object.Destroy(temp);
-                    return null;
                 }
-                Color32[] px = temp.GetPixels32();
-                int w = temp.width, h = temp.height;
-                UnityEngine.Object.Destroy(temp);
+                else
+                {
+                    px = BakeFromMesh(pmx, faceMatIdx, faceF, faceR, flipUv, BakeSize, cacheDir);
+                    if (px == null) return null;
+                    w = BakeSize;
+                    h = BakeSize;
+                }
 
                 var a = new SdfFaceAsset
                 {
@@ -296,23 +312,201 @@ namespace GF2
                     }
                 }
                 if (x1 < x0 || y1 < y0) { a.Theta = null; return null; }
-                a.BoxX = x0; a.BoxY = y0; a.BoxW = x1 - x0 + 1; a.BoxH = y1 - y0 + 1;
 
                 var (clone, basePx) = ReadableFaceBase(baseBytes, a.CloneW, a.CloneH);
                 if (clone == null) { a.Theta = null; return null; }
                 a.Base = basePx;
                 a.CloneW = clone.width;
                 a.CloneH = clone.height;
-                a.BoxW = Mathf.Min(a.BoxW, a.CloneW - a.BoxX);
-                a.BoxH = Mathf.Min(a.BoxH, a.CloneH - a.BoxY);
                 UnityEngine.Object.Destroy(clone);
+
+                int cx0 = Mathf.Clamp(Mathf.FloorToInt(x0 * (float)a.CloneW / w), 0, a.CloneW - 1);
+                int cy0 = Mathf.Clamp(Mathf.FloorToInt(y0 * (float)a.CloneH / h), 0, a.CloneH - 1);
+                int cx1 = Mathf.Clamp(Mathf.CeilToInt((x1 + 1) * (float)a.CloneW / w) - 1, cx0, a.CloneW - 1);
+                int cy1 = Mathf.Clamp(Mathf.CeilToInt((y1 + 1) * (float)a.CloneH / h) - 1, cy0, a.CloneH - 1);
+                a.BoxX = cx0;
+                a.BoxY = cy0;
+                a.BoxW = cx1 - cx0 + 1;
+                a.BoxH = cy1 - cy0 + 1;
                 if (a.BoxW <= 0 || a.BoxH <= 0) { a.Theta = null; return null; }
                 return a;
             }
             catch (Exception e)
             {
-                Plugin.Log.LogWarning($"[GF2] sdf_face decode failed: {e.Message}");
+                Plugin.Log.LogWarning($"[DollFrame] sdf_face decode failed: {e.Message}");
                 return null;
+            }
+        }
+
+        private static Color32[] BakeFromMesh(PmxParser.PmxModel pmx, int faceMatIdx,
+            Vector3 faceF, Vector3 faceR, bool flipUv, int size, string cacheDir)
+        {
+            if (pmx?.Normals == null || pmx.Uv == null || pmx.MaterialTris == null) return null;
+            var tris = pmx.MaterialTris[faceMatIdx];
+            if (tris == null || tris.Length < 3) return null;
+
+            int count = size * size;
+            var sumF = new float[count];
+            var sumR = new float[count];
+            var cover = new bool[count];
+            bool any = false;
+
+            for (int t = 0; t + 2 < tris.Length; t += 3)
+            {
+                int i0 = tris[t], i1 = tris[t + 1], i2 = tris[t + 2];
+                if (i0 < 0 || i1 < 0 || i2 < 0 ||
+                    i0 >= pmx.Uv.Length || i1 >= pmx.Uv.Length || i2 >= pmx.Uv.Length ||
+                    i0 >= pmx.Normals.Length || i1 >= pmx.Normals.Length || i2 >= pmx.Normals.Length)
+                    continue;
+
+                float x0 = pmx.Uv[i0].x * size;
+                float y0 = (flipUv ? 1f - pmx.Uv[i0].y : pmx.Uv[i0].y) * size;
+                float x1 = pmx.Uv[i1].x * size;
+                float y1 = (flipUv ? 1f - pmx.Uv[i1].y : pmx.Uv[i1].y) * size;
+                float x2 = pmx.Uv[i2].x * size;
+                float y2 = (flipUv ? 1f - pmx.Uv[i2].y : pmx.Uv[i2].y) * size;
+
+                float area = (x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0);
+                if (Mathf.Abs(area) < 1e-5f) continue;
+
+                int minX = Mathf.Max(0, Mathf.FloorToInt(Mathf.Min(x0, Mathf.Min(x1, x2))));
+                int maxX = Mathf.Min(size - 1, Mathf.CeilToInt(Mathf.Max(x0, Mathf.Max(x1, x2))));
+                int minY = Mathf.Max(0, Mathf.FloorToInt(Mathf.Min(y0, Mathf.Min(y1, y2))));
+                int maxY = Mathf.Min(size - 1, Mathf.CeilToInt(Mathf.Max(y0, Mathf.Max(y1, y2))));
+                if (minX > maxX || minY > maxY) continue;
+
+                Vector3 n0 = pmx.Normals[i0], n1 = pmx.Normals[i1], n2 = pmx.Normals[i2];
+                float invArea = 1f / area;
+
+                for (int y = minY; y <= maxY; y++)
+                {
+                    float py = y + 0.5f;
+                    int row = y * size;
+                    for (int x = minX; x <= maxX; x++)
+                    {
+                        float px = x + 0.5f;
+                        float w0 = ((x1 - px) * (y2 - py) - (x2 - px) * (y1 - py)) * invArea;
+                        float w1 = ((x2 - px) * (y0 - py) - (x0 - px) * (y2 - py)) * invArea;
+                        float w2 = 1f - w0 - w1;
+                        if (w0 < -1e-4f || w1 < -1e-4f || w2 < -1e-4f) continue;
+
+                        Vector3 n = (n0 * w0 + n1 * w1 + n2 * w2).normalized;
+                        int idx = row + x;
+                        sumF[idx] += Vector3.Dot(n, faceF);
+                        sumR[idx] += Vector3.Dot(n, faceR);
+                        cover[idx] = true;
+                        any = true;
+                    }
+                }
+            }
+            if (!any) return null;
+
+            for (int i = 0; i < count; i++)
+            {
+                if (!cover[i]) continue;
+                float len = Mathf.Sqrt(sumF[i] * sumF[i] + sumR[i] * sumR[i]);
+                if (len > 1e-5f) { sumF[i] /= len; sumR[i] /= len; }
+                else { sumF[i] = 1f; sumR[i] = 0f; }
+            }
+
+            // Smooth the 2D direction vector (dirF, dirR) in UV space so nose/eye creases yield a clean SDF terminator
+            var tmpF = new float[count];
+            var tmpR = new float[count];
+            var tmpC = new bool[count];
+            SeparableBlur(sumF, sumR, cover, tmpF, tmpR, tmpC, size, radius: 6, dilate: true);
+            SeparableBlur(tmpF, tmpR, tmpC, sumF, sumR, cover, size, radius: 6, dilate: false);
+
+            var outPx = new Color32[count];
+            for (int i = 0; i < count; i++)
+            {
+                if (!cover[i])
+                {
+                    outPx[i] = new Color32(0, 0, 0, 0);
+                    continue;
+                }
+                float theta = Mathf.Atan2(sumR[i], sumF[i]);
+                int k = Mathf.Clamp(Mathf.RoundToInt((theta + Mathf.PI) / (2f * Mathf.PI) * 255f - 0.5f), 0, 255);
+                byte b = (byte)k;
+                outPx[i] = new Color32(b, b, b, 255);
+            }
+
+            if (!string.IsNullOrEmpty(cacheDir) && Directory.Exists(cacheDir))
+            {
+                try
+                {
+                    var savePath = Path.Combine(cacheDir, SdfFaceAsset.ContainerKey);
+                    var tex = new Texture2D(size, size, TextureFormat.RGBA32, false, false);
+                    tex.SetPixels32(outPx);
+                    tex.Apply(false, false);
+                    File.WriteAllBytes(savePath, tex.EncodeToPNG());
+                    UnityEngine.Object.Destroy(tex);
+                    Plugin.Log.LogInfo($"[DollFrame] sdf_face: auto-baked {size}x{size} -> '{savePath}'");
+                }
+                catch (Exception ex)
+                {
+                    Plugin.Log.LogWarning($"[DollFrame] sdf_face cache write failed: {ex.Message}");
+                }
+            }
+            return outPx;
+        }
+
+        private static void SeparableBlur(float[] srcF, float[] srcR, bool[] srcC,
+            float[] dstF, float[] dstR, bool[] dstC, int size, int radius, bool dilate)
+        {
+            var hF = new float[size * size];
+            var hR = new float[size * size];
+            var hC = new bool[size * size];
+            for (int y = 0; y < size; y++)
+            {
+                int row = y * size;
+                for (int x = 0; x < size; x++)
+                {
+                    float af = 0f, ar = 0f;
+                    int cnt = 0;
+                    int x0 = Mathf.Max(0, x - radius), x1 = Mathf.Min(size - 1, x + radius);
+                    for (int xx = x0; xx <= x1; xx++)
+                    {
+                        int si = row + xx;
+                        if (srcC[si]) { af += srcF[si]; ar += srcR[si]; cnt++; }
+                    }
+                    int di = row + x;
+                    if (cnt > 0 && (srcC[di] || dilate))
+                    {
+                        hF[di] = af / cnt;
+                        hR[di] = ar / cnt;
+                        hC[di] = true;
+                    }
+                    else
+                    {
+                        hF[di] = 0f; hR[di] = 0f; hC[di] = false;
+                    }
+                }
+            }
+            for (int y = 0; y < size; y++)
+            {
+                int row = y * size;
+                int y0 = Mathf.Max(0, y - radius), y1 = Mathf.Min(size - 1, y + radius);
+                for (int x = 0; x < size; x++)
+                {
+                    float af = 0f, ar = 0f;
+                    int cnt = 0;
+                    for (int yy = y0; yy <= y1; yy++)
+                    {
+                        int si = yy * size + x;
+                        if (hC[si]) { af += hF[si]; ar += hR[si]; cnt++; }
+                    }
+                    int di = row + x;
+                    if (cnt > 0 && (hC[di] || dilate))
+                    {
+                        dstF[di] = af / cnt;
+                        dstR[di] = ar / cnt;
+                        dstC[di] = true;
+                    }
+                    else
+                    {
+                        dstF[di] = 0f; dstR[di] = 0f; dstC[di] = false;
+                    }
+                }
             }
         }
 

@@ -10,14 +10,14 @@ using EFT;
 using HarmonyLib;
 using UnityEngine;
 
-namespace GF2
+namespace DollFrame
 {
     /// <summary>
     /// P0 runtime skeleton scaling engine (engine-risk validation phase).
     /// Scales the vanilla Tarkov player skeleton at player-body init so imported
     /// (unchanged) models fit; compensates the movement capsule; refreshes IK.
     /// </summary>
-    [BepInPlugin("kukki.DollFrame", "DollFrame", "0.3.18")]
+    [BepInPlugin("DollFrame", "DollFrame", "0.4.0")]
     public class Plugin : BaseUnityPlugin
     {
         internal static Plugin Instance;
@@ -71,15 +71,15 @@ namespace GF2
                 "Multiplier on the model's authored height when deriving the capsule (0 restores the vanilla PMC capsule; 1.0 = capsule follows the model height).");
 
             ReplaceBody = Config.Bind("Visual", "Replace player body", false,
-                "Replace the body with the packaged character (independent per-character rig + model-side proportion scaling). DEFAULT ON (2026-11-14-3): the 19 packages are REMODELED to game-native proportions (tools/remodel_pmx.py; arm chain 0.6808m, elbow 63.1%), so the display can return. Keep off for a fully vanilla raid (zero module interference with motion/camera).");
+                "Replace the body with the packaged character (independent per-character rig + model-side proportion scaling). Default OFF: the menu preview and card still work, and the module writes nothing to the player in raids (fully vanilla motion/camera). Turning it on applies PMX character folders from Characters in raids.");
             var modelOptions = DiscoverPackages();
             var defaultModel = modelOptions.FirstOrDefault(o => o.Contains("克萊妲")) ?? modelOptions.FirstOrDefault() ?? "";
-            Character = Config.Bind("Visual", "Character", defaultModel, new ConfigDescription("Character to import from the packaged set in BepInEx/plugins/kukki.GF2/GF2_Characters. Hidden from this window (switch in-game: the GF2 row on the menu Overall screen, or the switch key); the value persists here.", modelOptions.Length > 0 ? new AcceptableValueList<string>(modelOptions) : null, new BrowsableAttribute(false)));
+            Character = Config.Bind("Visual", "Character", defaultModel, new ConfigDescription("Character to import from BepInEx/plugins/DollFrame/Characters/<folder>. Hidden from this window (switch in-game: the DollFrame row on the menu Overall screen, or the switch key); the value persists here.", modelOptions.Length > 0 ? new AcceptableValueList<string>(modelOptions) : null, new BrowsableAttribute(false)));
             SwitchKey = Config.Bind("Visual", "Switch character key", KeyCode.PageUp,
-                "Cycle the Visual/Character selection with a single key press (main menu only - ignored while a raid/hideout session is running, so a switch can never apply mid-session). Replaces opening the config manager (F12) to change characters. New .gfc packages need a game restart to appear in the cycle.");
+                "Cycle the Visual/Character selection with a single key press (main menu only - ignored while a raid/hideout session is running, so a switch can never apply mid-session). Replaces opening the config manager (F12) to change characters. New character folders need a game restart to appear in the cycle.");
             _menuOptions = modelOptions;
             if (modelOptions.Length == 0)
-                Log.LogWarning($"[GF2] no character packages found in '{CharactersDirectory}'; Character falls back to a text field");
+                Log.LogWarning($"[DollFrame] no character packages found in '{CharactersDirectory}'; Character falls back to a text field");
             PmxUnitScale = Config.Bind("Visual", "PMX unit scale", 0.078f,
                 "Meters per PMX unit (MMD: 1u = 8cm). 0.078 x 20.07u model height = ~1.57m.");
             PmxYOffset = Config.Bind("Visual", "Model Y offset (m)", 0f,
@@ -104,11 +104,11 @@ ProportionScale = Config.Bind("Visual", "Scale model to game proportions", true,
             ArmIkRetarget = Config.Bind("Visual", "IK arm retarget to game hands", true,
                 "臂鏈 IK 重定向（2026-11-14-9）：上臂/前臂改由兩骨 IK 求解，手端沿遊戲肩→掌方向伸展至模型臂長（ArmRatio ≈0.83–0.95）落點——TP 手部自然持槍姿勢。每幀仍僅寫 localRotation（零 localPosition/localScale 寫入，零拉伸契約不變），手腕/十指維持 palmL/R 原複製；胸腔 SDF 防肘入軀幹；死亡/布娃娃自動回退 FK 複製。Build 時讀取，變更需重新掛載（切換角色或重進戰局）。");
             ReplaceVoice = Config.Bind("Visual", "Replace player voice", true,
-                "選擇角色建模時自動替換玩家語音（GF2_Voices/<角色家族>/）；切回 Vanilla (PMC) 時還原原版語音。");
+                "選擇角色建模時自動替換玩家語音（Voices/<角色家族>/）；切回 Vanilla (PMC) 時還原原版語音。");
             SecondaryPhysics = Config.Bind("Visual", "Enable secondary physics", true,
                 "啟用角色次要物理引擎（頭髮、裙擺、絲帶、衣襬、胸部彈性），含身體膠囊碰撞防穿模與嚴格零拉伸約束；前瀏海固定不動。");
             EnableRimLight = Config.Bind("Visual", "Enable rim light", true,
-                "啟用角色環境自適應邊緣光（Rim Light）與布料／絲襪掠射光澤（GF2/CharacterPBR Shader）。");
+                "啟用角色環境自適應邊緣光（Rim Light）與布料／絲襪掠射光澤（DollFrame/CharacterPBR Shader）。");
             RimLightIntensity = Config.Bind("Visual", "Rim light intensity", 0.65f,
                 new ConfigDescription("邊緣光強度倍率（0 = 關閉，建議 0.4–1.2）。", new AcceptableValueRange<float>(0f, 2.5f)));
             RimLightPower = Config.Bind("Visual", "Rim light sharpness", 3.2f,
@@ -123,7 +123,7 @@ ProportionScale = Config.Bind("Visual", "Scale model to game proportions", true,
 
             // 裝備視覺隱藏（2026-11-07 起承接 EFT.Transmog-cust）：資料級快照清空，效果不變。
             HideArmor = Config.Bind("Equipment", "Hide armor on replaced bodies", true,
-                "Hide the PMC armor visual on GF2-replaced bodies (menu body, raid body, FP viewmodel, flea card). Real slot equipment and its effects are untouched (data-level snapshot, ported from EFT.Transmog-cust).");
+                "Hide the PMC armor visual on DollFrame-replaced bodies (menu body, raid body, FP viewmodel, flea card). Real slot equipment and its effects are untouched (data-level snapshot, ported from EFT.Transmog-cust).");
             HideTacticalRig = Config.Bind("Equipment", "Hide tactical rig on replaced bodies", true,
                 "Same as hide-armor, for the tactical rig slot.");
             HideBackpack = Config.Bind("Equipment", "Hide backpack on replaced bodies", true,
@@ -141,7 +141,7 @@ ProportionScale = Config.Bind("Visual", "Scale model to game proportions", true,
 
             // Each container is patched independently so one failure can't silently abort
             // the rest of Awake (Unity log isn't captured to LogOutput.log in this setup).
-            var harmony = new Harmony("kukki.DollFrame");
+            var harmony = new Harmony("DollFrame");
             TryPatch(harmony, typeof(Patches));
             TryPatch(harmony, typeof(CapsulePatches));
             TryPatch(harmony, typeof(BodyReplacer));
@@ -151,7 +151,7 @@ ProportionScale = Config.Bind("Visual", "Scale model to game proportions", true,
             TryPatch(harmony, typeof(CharacterSwitchUI));
             var count = 0;
             foreach (var m in harmony.GetPatchedMethods()) count++;
-            Log.LogInfo($"GF2 loaded (Replace player body={ReplaceBody.Value}, {count} patched methods, {modelOptions.Length} character models)");
+            Log.LogInfo($"DollFrame loaded (Replace player body={ReplaceBody.Value}, {count} patched methods, {modelOptions.Length} character models)");
         }
 
         private static float _lastBlockedLog;
@@ -167,7 +167,7 @@ ProportionScale = Config.Bind("Visual", "Scale model to game proportions", true,
                     if (Time.unscaledTime - _lastBlockedLog > 2f)
                     {
                         _lastBlockedLog = Time.unscaledTime;
-                        Log.LogInfo("[GF2] character switch key ignored outside the main menu (needs the menu preview up and no raid/hideout session)");
+                        Log.LogInfo("[DollFrame] character switch key ignored outside the main menu (needs the menu preview up and no raid/hideout session)");
                     }
                     return;
                 }
@@ -176,12 +176,12 @@ ProportionScale = Config.Bind("Visual", "Scale model to game proportions", true,
                 var prev = Character?.Value;
                 var idx = Array.IndexOf(opts, prev);
                 Character.Value = opts[(idx + 1) % opts.Length];
-                Log.LogInfo($"[GF2] character switch -> '{Character.Value}'");
+                Log.LogInfo($"[DollFrame] character switch -> '{Character.Value}'");
                 NotifyCharacterChanged();
             }
             catch (Exception e)
             {
-                Log.LogError($"[GF2] character switch failed: {e}");
+                Log.LogError($"[DollFrame] character switch failed: {e}");
             }
         }
 
@@ -202,7 +202,7 @@ ProportionScale = Config.Bind("Visual", "Scale model to game proportions", true,
             }
             catch (Exception e)
             {
-                Log.LogWarning($"[GF2] character change sync failed: {e.Message}");
+                Log.LogWarning($"[DollFrame] character change sync failed: {e.Message}");
             }
         }
 
@@ -224,7 +224,7 @@ ProportionScale = Config.Bind("Visual", "Scale model to game proportions", true,
         internal static readonly string CharactersDirectory = Path.Combine(
             Path.GetDirectoryName(typeof(Plugin).Assembly.Location), "Characters");
 
-        private static readonly string[] CharacterFolderNames = { "Characters", "GF2_Characters" };
+        private static readonly string[] CharacterFolderNames = { "Characters", "DollFrame_Characters" };
 
         /// <summary>Enumerate all character package directories (own plugin folder + sibling content packs under BepInEx/plugins).</summary>
         internal static IEnumerable<string> GetCharacterDirectories()
@@ -255,38 +255,39 @@ ProportionScale = Config.Bind("Visual", "Scale model to game proportions", true,
             }
         }
 
-        /// <summary>Display name (file name without .gfc) per packaged character, with Vanilla (PMC) prepended.</summary>
+        /// <summary>Display name (folder name containing .pmx) per character, with Vanilla (PMC) prepended.</summary>
         private static string[] DiscoverPackages()
         {
             try
             {
                 var pkgs = GetCharacterDirectories()
-                    .SelectMany(d => Directory.GetFiles(d, "*.gfc"))
-                    .Select(Path.GetFileNameWithoutExtension)
+                    .SelectMany(d => PmxContainer.EnumeratePackages(d))
+                    .Select(Path.GetFileName)
                     .Distinct(StringComparer.Ordinal)
                     .OrderBy(n => n, StringComparer.Ordinal);
                 return VanillaSelection.PrependVanilla(pkgs);
             }
             catch (Exception e)
             {
-                Log.LogWarning($"[GF2] character package scan failed: {e.Message}");
+                Log.LogWarning($"[DollFrame] character package scan failed: {e.Message}");
                 return new[] { VanillaSelection.VanillaPackageName };
             }
         }
 
-        /// <summary>Menu switch UI 的即時重掃（每次畫面 Show／下拉展開都重掃，新 .gfc 免重啟即出現）。</summary>
+        /// <summary>Menu switch UI 的即時重掃（每次畫面 Show／下拉展開都重掃，新角色資料夾免重啟即出現）。</summary>
         internal static string[] MenuPackageNames() => DiscoverPackages();
 
-        /// <summary>Full .gfc path for the selected character, or null when unset/missing/vanilla.</summary>
+        /// <summary>Full character folder path for the selected character, or null when unset/missing/vanilla.</summary>
         internal static string ResolvePackagePath()
         {
             var choice = Character?.Value;
             if (VanillaSelection.IsVanilla(choice)) return null;
-            var fileName = Path.GetFileName(choice) + ".gfc";
+            var name = Path.GetFileName(choice);
             foreach (var dir in GetCharacterDirectories())
             {
-                var path = Path.Combine(dir, fileName);
-                if (File.Exists(path)) return path;
+                var charDir = Path.Combine(dir, name);
+                if (Directory.Exists(charDir) && PmxContainer.FindPmxInDirectory(charDir) != null)
+                    return charDir;
             }
             return null;
         }
@@ -299,7 +300,7 @@ ProportionScale = Config.Bind("Visual", "Scale model to game proportions", true,
             }
             catch (System.Exception e)
             {
-                Log.LogError($"[GF2] patching {container.Name} failed: {e}");
+                Log.LogError($"[DollFrame] patching {container.Name} failed: {e}");
             }
         }
     }

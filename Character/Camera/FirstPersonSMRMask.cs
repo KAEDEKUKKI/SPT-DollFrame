@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace GF2
+namespace DollFrame
 {
     /// <summary>
     /// Point of view state for character rendering.
@@ -106,7 +106,7 @@ namespace GF2
             }
         }
 
-#if !GF2_PMX_PARSER_ONLY
+#if !DOLLFRAME_PMX_PARSER_ONLY
         /// <summary>
         /// 從 EFT 原版 EPointOfView 轉換為內部 PointOfView。
         /// </summary>

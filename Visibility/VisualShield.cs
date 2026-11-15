@@ -1,4 +1,4 @@
-namespace GF2
+namespace DollFrame
 {
     public static class VisualShieldConfig
     {
