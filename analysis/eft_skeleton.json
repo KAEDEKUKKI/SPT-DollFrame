@@ -1,0 +1,1029 @@
+{
+ "Base HumanRCollarbone": {
+  "parent": "Base HumanRibcage",
+  "pos": [
+   -0.01365,
+   0.08076,
+   0.00466
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanSpine3": {
+  "parent": "Base HumanSpine2",
+  "pos": [
+   -0.18613,
+   -0.0,
+   -0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanLDigit23": {
+  "parent": "Base HumanLDigit22",
+  "pos": [
+   -0.02715,
+   0.0,
+   -0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "LCollarbone_anim": {
+  "parent": "Base HumanSpine3",
+  "pos": [
+   -0.19588,
+   0.06296,
+   0.05088
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "IK_S_RPalm": {
+  "parent": "Base HumanSpine3",
+  "pos": [
+   -0.14652,
+   0.49403,
+   -0.38029
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanLForearm3": {
+  "parent": "Base HumanLForearm2",
+  "pos": [
+   -0.08365,
+   -0.0,
+   -0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "weapon_holster": {
+  "parent": "Base HumanSpine3",
+  "pos": [
+   -0.31301,
+   -0.16235,
+   -0.27075
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanLDigit43": {
+  "parent": "Base HumanLDigit42",
+  "pos": [
+   -0.03003,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanRCalf": {
+  "parent": "Base HumanRThigh2",
+  "pos": [
+   -0.22811,
+   0.0,
+   -0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "weapon_holster1": {
+  "parent": "Base HumanSpine3",
+  "pos": [
+   -0.31602,
+   -0.16784,
+   0.16938
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanLDigit11": {
+  "parent": "Base HumanLPalm",
+  "pos": [
+   -0.04128,
+   -0.02087,
+   0.04004
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanRDigit11": {
+  "parent": "Base HumanRPalm",
+  "pos": [
+   -0.04128,
+   -0.02087,
+   -0.04004
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanGear5": {
+  "parent": "Base HumanSpine1",
+  "pos": [
+   -0.04231,
+   0.20737,
+   -5e-05
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanLForearm1": {
+  "parent": "Base HumanLUpperarm",
+  "pos": [
+   -0.29651,
+   -0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanLToe": {
+  "parent": "Base HumanLFoot",
+  "pos": [
+   -0.15451,
+   -0.0,
+   -0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanLForearm2": {
+  "parent": "Base HumanLForearm1",
+  "pos": [
+   -0.08365,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "IK_S_LPalm": {
+  "parent": "Base HumanSpine3",
+  "pos": [
+   -0.15151,
+   0.48493,
+   0.39268
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanRToe": {
+  "parent": "Base HumanRFoot",
+  "pos": [
+   -0.15451,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanRDigit23": {
+  "parent": "Base HumanRDigit22",
+  "pos": [
+   -0.02715,
+   -0.0,
+   -0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanLDigit12": {
+  "parent": "Base HumanLDigit11",
+  "pos": [
+   -0.03977,
+   -0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Bend_Goal_Right": {
+  "parent": "Base HumanSpine3",
+  "pos": [
+   0.18544,
+   -0.19974,
+   -0.52636
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanRDigit51": {
+  "parent": "Base HumanRPalm",
+  "pos": [
+   -0.0987,
+   0.00212,
+   0.03863
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanLCollarbone": {
+  "parent": "Base HumanRibcage",
+  "pos": [
+   0.0032,
+   0.01734,
+   0.08012
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "RCollarbone_anim": {
+  "parent": "Base HumanSpine3",
+  "pos": [
+   -0.1952,
+   0.0642,
+   -0.04911
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanGear4_1": {
+  "parent": "Base HumanGear4",
+  "pos": [
+   -0.1254,
+   0.00148,
+   -0.00118
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanRDigit41": {
+  "parent": "Base HumanRPalm",
+  "pos": [
+   -0.10514,
+   0.00993,
+   0.01627
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanRFoot": {
+  "parent": "Base HumanRCalf",
+  "pos": [
+   -0.46025,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanLDigit41": {
+  "parent": "Base HumanLPalm",
+  "pos": [
+   -0.10514,
+   0.00993,
+   -0.01627
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanLDigit31": {
+  "parent": "Base HumanLPalm",
+  "pos": [
+   -0.1075,
+   0.01189,
+   0.00888
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanNeck": {
+  "parent": "Base HumanSpine3",
+  "pos": [
+   -0.20941,
+   -0.00369,
+   -5e-05
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanLDigit22": {
+  "parent": "Base HumanLDigit21",
+  "pos": [
+   -0.05621,
+   0.0,
+   -0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Weapon_root_3rd_anim": {
+  "parent": "Base HumanSpine3",
+  "pos": [
+   -0.19606,
+   0.16535,
+   -0.12762
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Skeleton": {
+  "parent": "(ROOT)",
+  "pos": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Bend_Goal_Left": {
+  "parent": "Base HumanSpine3",
+  "pos": [
+   0.0879,
+   -0.30544,
+   0.33843
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanRThigh1": {
+  "parent": "Base HumanPelvis",
+  "pos": [
+   -0.0073,
+   0.02081,
+   -0.09091
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanRDigit32": {
+  "parent": "Base HumanRDigit31",
+  "pos": [
+   -0.05877,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanLPalm": {
+  "parent": "Base HumanLForearm3",
+  "pos": [
+   -0.08365,
+   -0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   0.99999,
+   1.00001
+  ]
+ },
+ "Base HumanRDigit21": {
+  "parent": "Base HumanRPalm",
+  "pos": [
+   -0.10534,
+   0.00032,
+   -0.03605
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanLUpperarm": {
+  "parent": "Base HumanLCollarbone",
+  "pos": [
+   -0.13337,
+   2e-05,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanPelvis": {
+  "parent": "Root_Joint",
+  "pos": [
+   0.0,
+   0.928,
+   -0.01522
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanLFoot": {
+  "parent": "Base HumanLCalf",
+  "pos": [
+   -0.46025,
+   0.0,
+   -0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanLDigit51": {
+  "parent": "Base HumanLPalm",
+  "pos": [
+   -0.0987,
+   0.00212,
+   -0.03863
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanLDigit21": {
+  "parent": "Base HumanLPalm",
+  "pos": [
+   -0.10534,
+   0.00032,
+   0.03605
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanLThigh1": {
+  "parent": "Base HumanPelvis",
+  "pos": [
+   -0.0073,
+   0.02081,
+   0.09091
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanRDigit43": {
+  "parent": "Base HumanRDigit42",
+  "pos": [
+   -0.03003,
+   0.0,
+   -0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanHead": {
+  "parent": "Base HumanNeck",
+  "pos": [
+   -0.1136,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanGear4": {
+  "parent": "Base HumanSpine1",
+  "pos": [
+   -0.23026,
+   0.10881,
+   0.1912
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanLDigit13": {
+  "parent": "Base HumanLDigit12",
+  "pos": [
+   -0.03727,
+   -0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanLDigit53": {
+  "parent": "Base HumanLDigit52",
+  "pos": [
+   -0.01978,
+   0.0,
+   -0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanRUpperarm": {
+  "parent": "Base HumanRCollarbone",
+  "pos": [
+   -0.11829,
+   -0.06152,
+   -0.00383
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanRForearm3": {
+  "parent": "Base HumanRForearm2",
+  "pos": [
+   -0.08365,
+   -0.0,
+   -0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanRDigit12": {
+  "parent": "Base HumanRDigit11",
+  "pos": [
+   -0.03977,
+   0.0,
+   -0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanGear1": {
+  "parent": "Base HumanSpine1",
+  "pos": [
+   -0.18929,
+   0.05183,
+   -0.16064
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Root_Joint": {
+  "parent": "Skeleton",
+  "pos": [
+   -0.0,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanLDigit52": {
+  "parent": "Base HumanLDigit51",
+  "pos": [
+   -0.04016,
+   0.0,
+   -0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanGear2": {
+  "parent": "Base HumanSpine1",
+  "pos": [
+   -0.15733,
+   0.19556,
+   0.0001
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanRDigit33": {
+  "parent": "Base HumanRDigit32",
+  "pos": [
+   -0.0335,
+   -0.0,
+   -0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanRForearm2": {
+  "parent": "Base HumanRForearm1",
+  "pos": [
+   -0.08365,
+   -0.0,
+   -0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanRDigit22": {
+  "parent": "Base HumanRDigit21",
+  "pos": [
+   -0.05621,
+   -0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanRForearm1": {
+  "parent": "Base HumanRUpperarm",
+  "pos": [
+   -0.29651,
+   -0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Weapon_root": {
+  "parent": "Base HumanRibcage",
+  "pos": [
+   -0.0569,
+   0.20116,
+   0.00981
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanGear3": {
+  "parent": "Base HumanSpine1",
+  "pos": [
+   -0.19174,
+   0.0513,
+   0.15456
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanLDigit42": {
+  "parent": "Base HumanLDigit41",
+  "pos": [
+   -0.05061,
+   0.0,
+   -0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanRPalm": {
+  "parent": "Base HumanRForearm3",
+  "pos": [
+   -0.08365,
+   -0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   0.99999,
+   1.00001
+  ]
+ },
+ "Base HumanSpine2": {
+  "parent": "Base HumanSpine1",
+  "pos": [
+   -0.16241,
+   -0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanRibcage": {
+  "parent": "Base HumanSpine3",
+  "pos": [
+   -0.20917,
+   0.0,
+   -0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanRDigit52": {
+  "parent": "Base HumanRDigit51",
+  "pos": [
+   -0.04016,
+   -0.0,
+   -0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanSpine1": {
+  "parent": "Base HumanPelvis",
+  "pos": [
+   -0.04719,
+   -0.00361,
+   -0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanRDigit13": {
+  "parent": "Base HumanRDigit12",
+  "pos": [
+   -0.03727,
+   0.0,
+   -0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanLCalf": {
+  "parent": "Base HumanLThigh2",
+  "pos": [
+   -0.22812,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanRDigit53": {
+  "parent": "Base HumanRDigit52",
+  "pos": [
+   -0.01978,
+   0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanLThigh2": {
+  "parent": "Base HumanLThigh1",
+  "pos": [
+   -0.22812,
+   -0.0,
+   -0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Camera_animated_3rd": {
+  "parent": "Root_Joint",
+  "pos": [
+   0.04224,
+   1.55543,
+   -0.00093
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanRDigit31": {
+  "parent": "Base HumanRPalm",
+  "pos": [
+   -0.1075,
+   0.01189,
+   -0.00888
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanRDigit42": {
+  "parent": "Base HumanRDigit41",
+  "pos": [
+   -0.05061,
+   -0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanLDigit32": {
+  "parent": "Base HumanLDigit31",
+  "pos": [
+   -0.05877,
+   0.0,
+   -0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanLDigit33": {
+  "parent": "Base HumanLDigit32",
+  "pos": [
+   -0.0335,
+   -0.0,
+   -0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanRThigh2": {
+  "parent": "Base HumanRThigh1",
+  "pos": [
+   -0.22811,
+   -0.0,
+   0.0
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "Base HumanBackpack": {
+  "parent": "Base HumanSpine3",
+  "pos": [
+   0.13772,
+   -0.05824,
+   0.00165
+  ],
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ }
+}

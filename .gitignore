@@ -1,0 +1,48 @@
+# .NET / Build artifacts
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.nupkg
+*.snupkg
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+venv/
+
+# Unity (Shaders/UnityBuilder)
+Shaders/UnityBuilder/Library/
+Shaders/UnityBuilder/Temp/
+Shaders/UnityBuilder/Logs/
+Shaders/UnityBuilder/UserSettings/
+Shaders/UnityBuilder/Obj/
+Shaders/UnityBuilder/Build/
+Shaders/UnityBuilder/*.csproj
+Shaders/UnityBuilder/*.sln
+Shaders/Shaders
+Shaders/*.manifest
+
+# IDE / Editor / OS
+.vs/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Local scratch / debug / agent state / logs
+.omo/
+.serena/
+.superpowers/
+Proof/
+bug/
+*.log
+!tools/fixtures/*.log

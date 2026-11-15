@@ -1,0 +1,58 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>DollFrame</AssemblyName>
+    <RootNamespace>GF2</RootNamespace>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <Version>0.3.18</Version>
+    <Description>Modular PMX character model, IK retargeting, PBR/SDF shader, and voice replacement framework for SPTarkov.</Description>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+    <NoWarn>NU1701</NoWarn>
+  </PropertyGroup>
+
+  <Import Project="UserSettings.props" Condition="exists('UserSettings.props')" />
+
+  <ItemGroup>
+    <Compile Remove="Packager/**" />
+    <Compile Remove="Tests/**" />
+    <Compile Remove="analysis/**" />
+    <Compile Remove="bug/**" />
+    <Compile Remove="ServerMod/**" />
+    <Compile Remove="Shaders/**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="Packager/MeshSplitter.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(SPTTarkovDirectory)'!=''">
+    <Reference Include="$(SPTTarkovDirectory)\EscapeFromTarkov_Data\Managed\UnityEngine.dll"><Private>false</Private></Reference>
+    <Reference Include="$(SPTTarkovDirectory)\EscapeFromTarkov_Data\Managed\UnityEngine.CoreModule.dll"><Private>false</Private></Reference>
+    <Reference Include="$(SPTTarkovDirectory)\EscapeFromTarkov_Data\Managed\UnityEngine.AssetBundleModule.dll"><Private>false</Private></Reference>
+    <Reference Include="$(SPTTarkovDirectory)\EscapeFromTarkov_Data\Managed\UnityEngine.AnimationModule.dll"><Private>false</Private></Reference>
+    <Reference Include="$(SPTTarkovDirectory)\EscapeFromTarkov_Data\Managed\UnityEngine.AudioModule.dll"><Private>false</Private></Reference>
+    <Reference Include="$(SPTTarkovDirectory)\EscapeFromTarkov_Data\Managed\UnityEngine.ImageConversionModule.dll"><Private>false</Private></Reference>
+    <Reference Include="$(SPTTarkovDirectory)\EscapeFromTarkov_Data\Managed\UnityEngine.PhysicsModule.dll"><Private>false</Private></Reference>
+    <Reference Include="$(SPTTarkovDirectory)\EscapeFromTarkov_Data\Managed\UnityEngine.InputLegacyModule.dll"><Private>false</Private></Reference>
+    <Reference Include="$(SPTTarkovDirectory)\EscapeFromTarkov_Data\Managed\UnityEngine.TextRenderingModule.dll"><Private>false</Private></Reference>
+    <Reference Include="$(SPTTarkovDirectory)\EscapeFromTarkov_Data\Managed\Assembly-CSharp.dll"><Private>false</Private></Reference>
+    <Reference Include="$(SPTTarkovDirectory)\EscapeFromTarkov_Data\Managed\AnimationSystem.Types.dll"><Private>false</Private></Reference>
+    <Reference Include="$(SPTTarkovDirectory)\EscapeFromTarkov_Data\Managed\UnityEngine.UI.dll"><Private>false</Private></Reference>
+    <Reference Include="$(SPTTarkovDirectory)\EscapeFromTarkov_Data\Managed\Unity.TextMeshPro.dll"><Private>false</Private></Reference>
+    <Reference Include="$(SPTTarkovDirectory)\EscapeFromTarkov_Data\Managed\Sirenix.Serialization.dll"><Private>false</Private></Reference>
+    <Reference Include="$(SPTTarkovDirectory)\EscapeFromTarkov_Data\Managed\Sirenix.Serialization.Config.dll"><Private>false</Private></Reference>
+    <Reference Include="$(SPTTarkovDirectory)\EscapeFromTarkov_Data\Managed\Sirenix.Utilities.dll"><Private>false</Private></Reference>
+    <Reference Include="$(SPTTarkovDirectory)\EscapeFromTarkov_Data\Managed\Sirenix.OdinInspector.Attributes.dll"><Private>false</Private></Reference>
+    <Reference Include="$(SPTTarkovDirectory)\BepInEx\core\0Harmony.dll"><Private>false</Private></Reference>
+    <Reference Include="$(SPTTarkovDirectory)\BepInEx\core\BepInEx.dll"><Private>false</Private></Reference>
+  </ItemGroup>
+
+  <Target Name="CopyOutput" AfterTargets="Build" Condition="'$(CopyOutputToBepInEx)'=='true'">
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(SPTTarkovDirectory)\BepInEx\plugins\kukki.DollFrame\" />
+    <Copy SourceFiles="Shaders\gf2_shaders.bundle" DestinationFolder="$(SPTTarkovDirectory)\BepInEx\plugins\kukki.DollFrame\" Condition="exists('Shaders\gf2_shaders.bundle')" />
+  </Target>
+
+</Project>

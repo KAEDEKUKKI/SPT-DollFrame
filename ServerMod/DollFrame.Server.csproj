@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>DollFrame.Server</AssemblyName>
+    <Version>0.3.18</Version>
+    <Description>SPT-DollFrame character and voice replacement framework companion.</Description>
+    <RootNamespace>GF2.Server</RootNamespace>
+    <!-- SPTarkov server root（DLL 引用與部屬目標；對齊 ORBIT.Server 的 SPT 4.1 參照集） -->
+    <SPT_DIR Condition=" '$(SPT_DIR)' == '' ">C:\SPT\SPT</SPT_DIR>
+    <ModDeployDir>$(SPT_DIR)/user/mods/kukki.DollFrame</ModDeployDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="SPTarkov.Server.Core"><HintPath>$(SPT_DIR)\SPTarkov.Server.Core.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="SPTarkov.Common"><HintPath>$(SPT_DIR)\SPTarkov.Common.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="SPTarkov.DI"><HintPath>$(SPT_DIR)\SPTarkov.DI.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="SemanticVersioning"><HintPath>$(SPT_DIR)\SemanticVersioning.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+
+  <Target Name="EnsureSptDir" BeforeTargets="Build">
+    <Error Condition="!Exists('$(SPT_DIR)\SPTarkov.Server.Core.dll')" Text="SPT_DIR does not point at a valid SPTarkov server (SPTarkov.Server.Core.dll not found)." />
+  </Target>
+
+  <Target Name="DeployMod" AfterTargets="Build">
+    <MakeDir Directories="$(ModDeployDir)" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ModDeployDir)" SkipUnchangedFiles="true" />
+    <Message Importance="high" Text="[GF2.Server] Deployed DLL to $(ModDeployDir)" />
+  </Target>
+
+</Project>

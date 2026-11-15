@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>GF2Packager</AssemblyName>
+    <Nullable>disable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <NoWarn>NU1701</NoWarn>
+    <StartupObject>PackagerProgram</StartupObject>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <DefineConstants>GF2_PMX_PARSER_ONLY</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="MeshSplitter.cs" />
+    <Compile Include="Stubs.cs" />
+    <Compile Include="../Character/Contract/ModelProfile.cs" Link="shared/ModelProfile.cs" />
+    <Compile Include="../Character/ModelMetrics.cs" Link="shared/ModelMetrics.cs" />
+    <Compile Include="../Character/PmxRuntime.cs" Link="shared/PmxRuntime.cs" />
+  </ItemGroup>
+</Project>

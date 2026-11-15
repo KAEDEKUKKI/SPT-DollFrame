@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>GF2Verify</AssemblyName>
+    <Nullable>disable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <NoWarn>NU1701</NoWarn>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <DefineConstants>GF2_PMX_PARSER_ONLY</DefineConstants>
+    <StartupObject>Program</StartupObject>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="BindMathTest.cs" />
+    <Compile Include="FactorsCheck.cs" />
+    <Compile Include="ConstantsCheck.cs" />
+    <Compile Include="ProportionsCheck.cs" />
+    <Compile Include="ZeroStretchTest.cs" />
+    <Compile Include="ArmIkTest.cs" />
+    <Compile Include="PelvisDeltaCheck.cs" />
+    <Compile Include="GrantsCheck.cs" />
+    <Compile Include="VanillaOptionTest.cs" />
+    <Compile Include="VisualShieldTest.cs" />
+    <Compile Include="CacheTest.cs" />
+    <Compile Include="TelemetryCheck.cs" />
+    <Compile Include="ModelProfileTest.cs" />
+    <Compile Include="MeshSplitTest.cs" />
+    <Compile Include="FirstPersonSMRMaskTest.cs" />
+    <Compile Include="../Character/Camera/FirstPersonSMRMask.cs" Link="shared/Camera/FirstPersonSMRMask.cs" />
+    <Compile Include="../Packager/MeshSplitter.cs" Link="shared/MeshSplitter.cs" />
+    <Compile Include="../Character/Contract/ModelProfile.cs" Link="shared/ModelProfile.cs" />
+    <Compile Include="../Character/Contract/TelemetryRegistry.cs" Link="shared/TelemetryRegistry.cs" />
+    <Compile Include="../Character/ModelScaler.cs" Link="shared/ModelScaler.cs" />
+    <Compile Include="../Visibility/VisualShield.cs" Link="shared/VisualShield.cs" />
+    <Compile Include="../Visibility/VanillaSelection.cs" Link="shared/VanillaSelection.cs" />
+    <Compile Include="../Visibility/AccessoryFilter.cs" Link="shared/AccessoryFilter.cs" />
+    <Compile Include="../Character/BindMath.cs" Link="shared/BindMath.cs" />
+    <Compile Include="../Character/BoneContract.cs" Link="shared/BoneContract.cs" />
+    <Compile Include="../Character/ModelMetrics.cs" Link="shared/ModelMetrics.cs" />
+    <Compile Include="../Character/CharacterRig.cs" Link="shared/CharacterRig.cs" />
+    <Compile Include="../Character/Kinematics/RigAim.cs" Link="shared/Kinematics/RigAim.cs" />
+    <Compile Include="../Character/Kinematics/TwoBoneIk.cs" Link="shared/Kinematics/TwoBoneIk.cs" />
+    <Compile Include="../Character/Kinematics/SpringPhysics.cs" Link="shared/Kinematics/SpringPhysics.cs" />
+    <Compile Include="../Character/Contract/RigPairing.cs" Link="shared/Contract/RigPairing.cs" />
+    <Compile Include="../Character/PmxRuntime.cs" Link="shared/PmxRuntime.cs" />
+    <Compile Include="../Packager/Stubs.cs" Link="stubs/Packager-Stubs.cs" />
+  </ItemGroup>
+</Project>

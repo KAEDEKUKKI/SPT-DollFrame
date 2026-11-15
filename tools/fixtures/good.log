@@ -1,0 +1,15 @@
+# synthetic fixture — formats mirrored from producers (SPEC log contract, 2026-11-14 架構反轉)
+# real session check happens in F3 against LogOutput.log (mtime-newer-than-DLL staleness rule)
+# one attach (preload/contract/rig/scale/body replaced) + attach timing/eviction/head mask lines
+[GF2] preload: kleda.gfc 43.2ms (cold)
+[GF2] pmx loaded: 'kleda.gfc' (kleda) verts=40213 tris=74112 bones=401
+[GF2] contract: 23/23 anchors, digits 1, fallback 2
+[GF2] scale: pkg=kleda k=1.0794 root=1
+[GF2] ik: cfg=on L=ok palm=BaseHumanLPalm ratio=0.87 len=0.48m R=ok palm=BaseHumanRPalm ratio=0.87 len=0.48m
+[GF2] rig: bones=401 mapped=51
+[GF2] ground: derived 0.0123m (override 0)
+[GF2] attach 12.4ms
+[GF2] body replaced on 'Kukki': vanilla hidden (11 renderers)
+[GF2] fp head mask: ShadowsOnly (alive)
+[GF2] cache: evicted kleda.gfc
+[GF2] ik target: L dir=(0.05,-0.25,0.97) reach=0.31m R dir=(0.05,-0.25,0.97) reach=0.31m
