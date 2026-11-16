@@ -1,11 +1,14 @@
 <p align="center">
-  <img src="AK-12%20%E7%B4%AB%E8%AA%BF%E3%83%86%E3%83%83%E3%82%AF%E3%82%A8%E3%83%B3%E3%83%96%E3%83%AC%E3%83%A0.png" alt="DollFrame Logo" width="220" />
+  <img src="AK-12%20%E7%B4%AB%E8%AA%BF%E3%83%86%E3%83%83%E3%82%AF%E3%82%A8%E3%83%B3%E3%83%96%E3%83%AC%E3%83%A0.png" alt="DollFrame Logo (ドールズフロントライン AK-12)" width="220" />
+</p>
+<p align="center">
+  <sub>アイコン画像には『ドールズフロントライン（少女前線）』の <strong>AK-12</strong> をイメージキャラクターとして使用しています。</sub>
 </p>
 
 <h1 align="center">DollFrame</h1>
 
 <p align="center">
-  <strong>SPTarkov 向けモジュール式 PMX キャラクター置換フレームワーク — PMX フォルダ直読み、独立リグ、2ボーン腕IK、PBR/SDF シェーディング、揺れ物物理＆ボイス置換。</strong>
+  <strong>Single Player Tushonka 向けモジュール式 PMX キャラクター置換フレームワーク — PMX フォルダ直読み、独立リグ、2ボーン腕IK、PBR/SDF シェーディング、揺れ物物理＆ボイス置換。</strong>
 </p>
 
 <p align="center">
@@ -20,7 +23,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Version-0.4.1-7c4dff?style=for-the-badge" alt="Version 0.4.1" />
-  <img src="https://img.shields.io/badge/SPTarkov-~4.1.6-blue?style=for-the-badge" alt="SPTarkov ~4.1.6" />
+  <img src="https://img.shields.io/badge/Single%20Player%20Tushonka-~4.1.6-blue?style=for-the-badge" alt="Single Player Tushonka ~4.1.6" />
   <img src="https://img.shields.io/badge/Platform-BepInEx%205%20%7C%20.NET%20Standard%202.1-success?style=for-the-badge" alt="Platform" />
   <img src="https://img.shields.io/badge/License-All%20Rights%20Reserved-lightgrey?style=for-the-badge" alt="License" />
 </p>
@@ -29,7 +32,7 @@
 
 ## 概要と設計思想
 
-**DollFrame** は [SPTarkov](https://www.sp-tarkov.com/) 向けの BepInEx クライアント MOD です。専用アーカイブへのパッキングを行わず、**PMX（MMD）2.0** キャラクターフォルダ（`.pmx`＋テクスチャ）を実行時に直接読み込み、プレイヤーの `Root_Joint` 配下に独立したスキン済みリグを構築します。毎フレームバニラのアニメーション姿勢をミラーリングしつつ、2ボーン IK によって腕を武器グリップへ正確に追従させ、`.wav` ボイス置換・揺れ物物理演算・カスタム PBR/SDF シェーダー・非破壊装備非表示を提供します。また、SPT サーバーコンソールにロード情報のみを表示する任意のサーバーコンパニオン（`DollFrame.Server.dll`）も同梱されています。
+**DollFrame** は [Single Player Tushonka](https://www.sp-tarkov.com/) 向けの BepInEx クライアント MOD です。専用アーカイブへのパッキングを行わず、**PMX（MMD）2.0** キャラクターフォルダ（`.pmx`＋テクスチャ）を実行時に直接読み込み、プレイヤーの `Root_Joint` 配下に独立したスキン済みリグを構築します。毎フレームバニラのアニメーション姿勢をミラーリングしつつ、2ボーン IK によって腕を武器グリップへ正確に追従させ、`.wav` ボイス置換・揺れ物物理演算・カスタム PBR/SDF シェーダー・非破壊装備非表示を提供します。また、SPT サーバーコンソールにロード情報のみを表示する任意のサーバーコンパニオン（`DollFrame.Server.dll`）も同梱されています。
 
 ### 設計思想
 
@@ -60,8 +63,8 @@
 
 ## 動作要件
 
-- **[SPTarkov](https://www.sp-tarkov.com/)**: `~4.1.6`
-- **BepInEx 5 + 0Harmony**: SPTarkov に同梱
+- **[Single Player Tushonka](https://www.sp-tarkov.com/)**: `~4.1.6`
+- **BepInEx 5 + 0Harmony**: Single Player Tushonka に同梱
 - **.NET SDK** *（ソースからビルドする場合のみ）*: `.NET Standard 2.1`（クライアント）／`.NET 8.0+`（サーバーコンパニオン）
 
 ---
@@ -69,7 +72,7 @@
 ## インストール方法
 
 1. リリースファイルをダウンロード、またはソースからビルドします。
-2. SPTarkov ディレクトリ内の所定パスへ配置します：
+2. Single Player Tushonka ディレクトリ内の所定パスへ配置します：
 
 | 内容 | 配置先パス |
 |---|---|
@@ -202,6 +205,7 @@ dotnet build ServerMod/DollFrame.Server.csproj -c Release
 ## クレジット＆ライセンス
 
 - **作者**: `kukki`
-- **使用技術**: [SPTarkov](https://www.sp-tarkov.com/), [BepInEx](https://github.com/BepInEx/BepInEx), [Harmony](https://github.com/pardeike/Harmony)
+- **使用技術**: [Single Player Tushonka](https://www.sp-tarkov.com/), [BepInEx](https://github.com/BepInEx/BepInEx), [Harmony](https://github.com/pardeike/Harmony)
+- **アイコン画像**: 『ドールズフロントライン（少女前線）』の **AK-12** をイメージキャラクターとして使用しています。
 - **関連ドキュメント**: [`CHANGELOG.md`](CHANGELOG.md) · [`AGENTS.md`](AGENTS.md)
 - **ライセンス**: **All rights reserved** © `kukki`（[`ServerMod/ModMetadata.cs`](ServerMod/ModMetadata.cs) 参照）。

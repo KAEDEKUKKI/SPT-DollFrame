@@ -1,11 +1,14 @@
 <p align="center">
-  <img src="AK-12%20%E7%B4%AB%E8%AA%BF%E3%83%86%E3%83%83%E3%82%AF%E3%82%A8%E3%83%B3%E3%83%96%E3%83%AC%E3%83%A0.png" alt="DollFrame Logo" width="220" />
+  <img src="AK-12%20%E7%B4%AB%E8%AA%BF%E3%83%86%E3%83%83%E3%82%AF%E3%82%A8%E3%83%B3%E3%83%96%E3%83%AC%E3%83%A0.png" alt="DollFrame Logo (AK-12 from Girls' Frontline)" width="220" />
+</p>
+<p align="center">
+  <sub>Project avatar / emblem features <strong>AK-12</strong> from <em>Girls' Frontline</em>.</sub>
 </p>
 
 <h1 align="center">DollFrame</h1>
 
 <p align="center">
-  <strong>Modular PMX Character Replacement Framework for SPTarkov — Direct PMX Folder Loading, Independent Rig, Two-Bone Arm IK, PBR/SDF Shading, Secondary Physics &amp; Voice Replacement.</strong>
+  <strong>Modular PMX Character Replacement Framework for Single Player Tushonka — Direct PMX Folder Loading, Independent Rig, Two-Bone Arm IK, PBR/SDF Shading, Secondary Physics &amp; Voice Replacement.</strong>
 </p>
 
 <p align="center">
@@ -20,7 +23,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Version-0.4.1-7c4dff?style=for-the-badge" alt="Version 0.4.1" />
-  <img src="https://img.shields.io/badge/SPTarkov-~4.1.6-blue?style=for-the-badge" alt="SPTarkov ~4.1.6" />
+  <img src="https://img.shields.io/badge/Single%20Player%20Tushonka-~4.1.6-blue?style=for-the-badge" alt="Single Player Tushonka ~4.1.6" />
   <img src="https://img.shields.io/badge/Platform-BepInEx%205%20%7C%20.NET%20Standard%202.1-success?style=for-the-badge" alt="Platform" />
   <img src="https://img.shields.io/badge/License-All%20Rights%20Reserved-lightgrey?style=for-the-badge" alt="License" />
 </p>
@@ -29,7 +32,7 @@
 
 ## Overview
 
-**DollFrame** is a BepInEx client-side framework for [SPTarkov](https://www.sp-tarkov.com/) that directly loads custom **PMX (MMD)** 2.0 character folders (`.pmx` + textures) at runtime without requiring proprietary archive packing. For each character, DollFrame constructs an independent skinned rig under the player's `Root_Joint`, mirrors the vanilla animation pose every frame, retargets arms onto in-game weapons with a two-bone IK solver, and provides automatic `.wav` voice replacement, secondary spring physics, custom PBR/SDF shaders, and non-destructive equipment hiding. An optional lightweight server companion (`DollFrame.Server.dll`) is included solely to display load metadata on the SPT server console.
+**DollFrame** is a BepInEx client-side framework for [Single Player Tushonka](https://www.sp-tarkov.com/) that directly loads custom **PMX (MMD)** 2.0 character folders (`.pmx` + textures) at runtime without requiring proprietary archive packing. For each character, DollFrame constructs an independent skinned rig under the player's `Root_Joint`, mirrors the vanilla animation pose every frame, retargets arms onto in-game weapons with a two-bone IK solver, and provides automatic `.wav` voice replacement, secondary spring physics, custom PBR/SDF shaders, and non-destructive equipment hiding. An optional lightweight server companion (`DollFrame.Server.dll`) is included solely to display load metadata on the SPT server console.
 
 ### Design Philosophy
 
@@ -60,8 +63,8 @@
 
 ## Requirements
 
-- **[SPTarkov](https://www.sp-tarkov.com/)**: `~4.1.6`
-- **BepInEx 5 + 0Harmony**: Bundled with SPTarkov
+- **[Single Player Tushonka](https://www.sp-tarkov.com/)**: `~4.1.6`
+- **BepInEx 5 + 0Harmony**: Bundled with Single Player Tushonka
 - **.NET SDK** *(only required if building from source)*: `.NET Standard 2.1` (client) / `.NET 8.0+` (server companion)
 
 ---
@@ -69,9 +72,9 @@
 ## Installation
 
 1. Download or build the release package.
-2. Copy the client files into your SPTarkov directory:
+2. Copy the client files into your Single Player Tushonka directory:
 
-| Component | Target Path in SPTarkov Directory |
+| Component | Target Path in Single Player Tushonka Directory |
 |---|---|
 | `DollFrame.dll` + `dollframe_shaders.bundle` | `BepInEx/plugins/DollFrame/` |
 | Character folders (`<Name>/*.pmx` + textures) | `BepInEx/plugins/DollFrame/Characters/` |
@@ -202,6 +205,7 @@ dotnet build ServerMod/DollFrame.Server.csproj -c Release
 ## Credits & License
 
 - **Author**: `kukki`
-- **Powered By**: [SPTarkov](https://www.sp-tarkov.com/), [BepInEx](https://github.com/BepInEx/BepInEx), [Harmony](https://github.com/pardeike/Harmony)
+- **Powered By**: [Single Player Tushonka](https://www.sp-tarkov.com/), [BepInEx](https://github.com/BepInEx/BepInEx), [Harmony](https://github.com/pardeike/Harmony)
+- **Avatar / Emblem**: Uses **AK-12** from *Girls' Frontline* as the project emblem image.
 - **Related Docs**: [`CHANGELOG.md`](CHANGELOG.md) · [`AGENTS.md`](AGENTS.md)
 - **License**: **All rights reserved** © `kukki` (see [`ServerMod/ModMetadata.cs`](ServerMod/ModMetadata.cs)).

@@ -1,11 +1,14 @@
 <p align="center">
-  <img src="AK-12%20%E7%B4%AB%E8%AA%BF%E3%83%86%E3%83%83%E3%82%AF%E3%82%A8%E3%83%B3%E3%83%96%E3%83%AC%E3%83%A0.png" alt="DollFrame Logo" width="220" />
+  <img src="AK-12%20%E7%B4%AB%E8%AA%BF%E3%83%86%E3%83%83%E3%82%AF%E3%82%A8%E3%83%B3%E3%83%96%E3%83%AC%E3%83%A0.png" alt="DollFrame Logo (少女前線 AK-12)" width="220" />
+</p>
+<p align="center">
+  <sub>專案頭像／徽章採用《少女前線》<strong>AK-12</strong> 作為形象圖。</sub>
 </p>
 
 <h1 align="center">DollFrame</h1>
 
 <p align="center">
-  <strong>面向 SPTarkov 的模組化 PMX 角色替換框架 — 直接讀取 PMX 資料夾、獨立骨架、兩骨手臂 IK、PBR/SDF 著色、次要物理與語音替換。</strong>
+  <strong>面向 Single Player Tushonka 的模組化 PMX 角色替換框架 — 直接讀取 PMX 資料夾、獨立骨架、兩骨手臂 IK、PBR/SDF 著色、次要物理與語音替換。</strong>
 </p>
 
 <p align="center">
@@ -20,7 +23,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Version-0.4.1-7c4dff?style=for-the-badge" alt="Version 0.4.1" />
-  <img src="https://img.shields.io/badge/SPTarkov-~4.1.6-blue?style=for-the-badge" alt="SPTarkov ~4.1.6" />
+  <img src="https://img.shields.io/badge/Single%20Player%20Tushonka-~4.1.6-blue?style=for-the-badge" alt="Single Player Tushonka ~4.1.6" />
   <img src="https://img.shields.io/badge/Platform-BepInEx%205%20%7C%20.NET%20Standard%202.1-success?style=for-the-badge" alt="Platform" />
   <img src="https://img.shields.io/badge/License-All%20Rights%20Reserved-lightgrey?style=for-the-badge" alt="License" />
 </p>
@@ -29,7 +32,7 @@
 
 ## 專案概述與設計理念
 
-**DollFrame** 是專為 [SPTarkov](https://www.sp-tarkov.com/) 開發的 BepInEx 客戶端模組，可於執行期直接載入解包後的 **PMX（MMD）2.0** 角色資料夾（`.pmx` 與貼圖），無需額外封裝專有歸檔格式。DollFrame 會在玩家 `Root_Joint` 下建立獨立的蒙皮骨架（Rig），逐幀鏡射原版動畫姿態，透過兩骨 IK 將雙臂精準重定向至武器握持點，並整合 `.wav` 語音替換、次要物理、自訂 PBR/SDF 著色器與非破壞性裝備隱藏。另附一個選用的伺服端 companion（`DollFrame.Server.dll`），僅用於在 SPT 伺服端啟動時顯示載入資訊。
+**DollFrame** 是專為 [Single Player Tushonka](https://www.sp-tarkov.com/) 開發的 BepInEx 客戶端模組，可於執行期直接載入解包後的 **PMX（MMD）2.0** 角色資料夾（`.pmx` 與貼圖），無需額外封裝專有歸檔格式。DollFrame 會在玩家 `Root_Joint` 下建立獨立的蒙皮骨架（Rig），逐幀鏡射原版動畫姿態，透過兩骨 IK 將雙臂精準重定向至武器握持點，並整合 `.wav` 語音替換、次要物理、自訂 PBR/SDF 著色器與非破壞性裝備隱藏。另附一個選用的伺服端 companion（`DollFrame.Server.dll`），僅用於在 SPT 伺服端啟動時顯示載入資訊。
 
 ### 核心設計理念
 
@@ -60,8 +63,8 @@
 
 ## 相容性與依賴
 
-- **[SPTarkov](https://www.sp-tarkov.com/)**：`~4.1.6`
-- **BepInEx 5 + 0Harmony**：隨 SPTarkov 內建
+- **[Single Player Tushonka](https://www.sp-tarkov.com/)**：`~4.1.6`
+- **BepInEx 5 + 0Harmony**：隨 Single Player Tushonka 內建
 - **.NET SDK** *（僅自行編譯原始碼時需要）*：`.NET Standard 2.1`（客戶端）／`.NET 8.0+`（伺服端 companion）
 
 ---
@@ -69,7 +72,7 @@
 ## 模組安裝步驟
 
 1. 下載釋出檔案或自行建置專案。
-2. 依下表將檔案放置於 SPTarkov 遊戲目錄對應位置：
+2. 依下表將檔案放置於 Single Player Tushonka 遊戲目錄對應位置：
 
 | 檔案內容 | 遊戲目錄目標路徑 |
 |---|---|
@@ -202,6 +205,7 @@ dotnet build ServerMod/DollFrame.Server.csproj -c Release
 ## 致謝與授權
 
 - **作者**：`kukki`
-- **技術基礎**：[SPTarkov](https://www.sp-tarkov.com/)、[BepInEx](https://github.com/BepInEx/BepInEx)、[Harmony](https://github.com/pardeike/Harmony)
+- **技術基礎**：[Single Player Tushonka](https://www.sp-tarkov.com/)、[BepInEx](https://github.com/BepInEx/BepInEx)、[Harmony](https://github.com/pardeike/Harmony)
+- **專案頭像**：使用《少女前線》**AK-12** 作為形象圖。
 - **相關文件**：[`CHANGELOG.md`](CHANGELOG.md) · [`AGENTS.md`](AGENTS.md)
 - **授權條款**：**All rights reserved** © `kukki`（詳見 [`ServerMod/ModMetadata.cs`](ServerMod/ModMetadata.cs)）。
