@@ -1,0 +1,9 @@
+<Project>
+	<PropertyGroup>
+		<SPTTarkovDirectory>C:\SPT</SPTTarkovDirectory>
+		<SPTServerDirectory>C:\SPT\SPT</SPTServerDirectory>
+
+		<!-- Copy the assembly to plugins after build -->
+		<CopyOutputToBepInEx>true</CopyOutputToBepInEx>
+	</PropertyGroup>
+</Project>

@@ -8,7 +8,13 @@
     <Version>0.4.1</Version>
     <Description>SPT-DollFrame character and voice replacement framework companion.</Description>
     <RootNamespace>DollFrame.Server</RootNamespace>
-    <!-- SPTarkov server root（DLL 引用與部屬目標；對齊 ORBIT.Server 的 SPT 4.1 參照集） -->
+  </PropertyGroup>
+
+  <Import Project="../UserSettings.props" Condition="exists('../UserSettings.props')" />
+
+  <PropertyGroup>
+    <!-- Single Player Tushonka server root（DLL 引用與部屬目標） -->
+    <SPT_DIR Condition=" '$(SPT_DIR)' == '' And '$(SPTServerDirectory)' != '' ">$(SPTServerDirectory)</SPT_DIR>
     <SPT_DIR Condition=" '$(SPT_DIR)' == '' ">C:\SPT\SPT</SPT_DIR>
     <ModDeployDir>$(SPT_DIR)/user/mods/DollFrame</ModDeployDir>
   </PropertyGroup>
