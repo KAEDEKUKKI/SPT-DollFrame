@@ -179,7 +179,7 @@ namespace DollFrame
                 LastFactorsByPackage[pkgName] = metrics.Factors;
 
                 // 全模型單一等比縮放因子（2026-11-14-6：腿錨定 uniform k，臂鏈縮放退役）
-                var scale = ModelScaleMath.Solve(metrics.Factors);
+                var scale = ModelScaleMath.Solve(metrics.Factors, metrics.HeightM);
 
                 // 縮放後模型身高 → 膠囊補償輸入（全身 uniform 等比，身高精確隨 k）
                 float scaledHeightM = scale.HasValue

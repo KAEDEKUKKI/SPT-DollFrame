@@ -33,6 +33,9 @@ namespace DollFrame
         /// <summary>腿錨定等比因子箝制帶（超帶時執行期箝制＋`scale:` 行帶 raw 標註）。</summary>
         internal const float KLegMin = 0.70f, KLegMax = 1.45f;
 
+        /// <summary>縮放後全身高度上限（m），防止長身／缺骨模型被腿錨定異常放大。</summary>
+        internal const float MaxScaledHeightM = 1.86f;
+
         /// <summary>模型腿鏈跨距（m）：thigh 跨距覆蓋 LThigh2+LCalf、shank 覆蓋 LFoot、foot 覆蓋 LToe。</summary>
         public static float ModelLegSpanM(float fThigh, float fShank, float fFoot)
         {
@@ -65,19 +68,34 @@ namespace DollFrame
         }
 
         /// <summary>
-        /// 由腿鏈因子推導全模型等比縮放因子；因子缺席（0）的群組不計入鏈長而由其餘段攤還。
+        /// 由腿鏈因子推導全模型等比縮放因子；因子缺席（0）的群組不計入模型鏈長，亦不計入對應遊戲鏈長
+        /// （避免缺足尖骨 `左足首先` 等模型把缺席段長攤入其餘段而異常放大）。
         /// 臂鏈因子（clavicle/uarm/farm）不再參與縮放（arm 錨定退役）；因子本身仍由
         /// `factors`/`proportions` 面照常量測與凍結。
         /// </summary>
-        public static ScalePlan? Solve(IReadOnlyDictionary<string, float> factors)
+        public static ScalePlan? Solve(IReadOnlyDictionary<string, float> factors, float heightM = 0f)
         {
             if (factors == null) return null;
-            float F(string g) => factors != null && factors.TryGetValue(g, out var v) ? v : 0f;
-            float legM = ModelLegSpanM(F("thigh"), F("shank"), F("foot"));
-            if (legM <= 0f) return null;
+            float F(string g) => factors.TryGetValue(g, out var v) ? v : 0f;
+            float fThigh = F("thigh");
+            float fShank = F("shank");
+            float fFoot = F("foot");
 
-            float raw = GameLegSpan / legM;
-            float k = ClampK(raw, KLegMin, KLegMax);
+            // 至少須具備大腿或小腿其一，避免僅憑單一足尖骨反推整具身體。
+            if (fThigh <= 0f && fShank <= 0f) return null;
+
+            float gameLegM = 0f;
+            float modelLegM = 0f;
+            if (fThigh > 0f) { gameLegM += GameThigh + GameCalf; modelLegM += fThigh * (GameThigh + GameCalf); }
+            if (fShank > 0f) { gameLegM += GameFoot; modelLegM += fShank * GameFoot; }
+            if (fFoot > 0f)  { gameLegM += GameToe; modelLegM += fFoot * GameToe; }
+            if (modelLegM <= 0f || gameLegM <= 0f) return null;
+
+            float raw = gameLegM / modelLegM;
+            float maxK = heightM > 0f
+                ? Math.Max(KLegMin, Math.Min(KLegMax, MaxScaledHeightM / heightM))
+                : KLegMax;
+            float k = ClampK(raw, KLegMin, maxK);
             const float eps = 1e-4f;
             return new ScalePlan(k, raw, Math.Abs(k - raw) > eps);
         }

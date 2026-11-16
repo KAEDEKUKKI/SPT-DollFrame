@@ -50,17 +50,24 @@ namespace DollFrame
         internal static ConfigEntry<bool> HideEarpiece;
         internal static ConfigEntry<bool> HideArmBand;
 
+        private sealed class ConfigurationManagerAttributes
+        {
+            public bool? IsAdvanced;
+        }
+
+        private static readonly ConfigurationManagerAttributes Advanced = new ConfigurationManagerAttributes { IsAdvanced = true };
+
         private void Awake()
         {
             Instance = this;
             Log = Logger;
 
             ApplyToOwnPlayer = Config.Bind("Scaling", "Apply to own player", true,
-                "Scale your own body skeleton.");
+                new ConfigDescription("Scale your own body skeleton.", null, Advanced));
             CapsuleScaleEnabled = Config.Bind("Capsule", "Scale capsule", true,
-                "Scale the character controller capsule (height/center). Unity CharacterController ignores transform scale, this compensates it.");
+                new ConfigDescription("Scale the character controller capsule (height/center). Unity CharacterController ignores transform scale, this compensates it.", null, Advanced));
             HeightMultiplier = Config.Bind("Scaling", "Height multiplier", 1.0f,
-                "Multiplier on the model's authored height when deriving the capsule (0 restores the vanilla PMC capsule; 1.0 = capsule follows the model height).");
+                new ConfigDescription("Multiplier on the model's authored height when deriving the capsule (0 restores the vanilla PMC capsule; 1.0 = capsule follows the model height).", null, Advanced));
 
             ReplaceBody = Config.Bind("Visual", "Replace player body", false,
                 "Replace the body with the packaged character (independent per-character rig + model-side proportion scaling). Default OFF: the menu preview and card still work, and the module writes nothing to the player in raids (fully vanilla motion/camera). Turning it on applies PMX character folders from Characters in raids.");
@@ -70,19 +77,19 @@ namespace DollFrame
             if (modelOptions.Length == 0)
                 Log.LogWarning($"[DollFrame] no character packages found in '{CharactersDirectory}'; Character falls back to a text field");
             PmxUnitScale = Config.Bind("Visual", "PMX unit scale", 0.078f,
-                "Meters per PMX unit (MMD: 1u = 8cm). 0.078 x 20.07u model height = ~1.57m.");
+                new ConfigDescription("Meters per PMX unit (MMD: 1u = 8cm). 0.078 x 20.07u model height = ~1.57m.", null, Advanced));
             PmxYOffset = Config.Bind("Visual", "Model Y offset (m)", 0f,
-                "Vertical correction if the model floats or sinks into the ground.");
+                new ConfigDescription("Vertical correction if the model floats or sinks into the ground.", null, Advanced));
             MaxTextureSize = Config.Bind("Visual", "Max texture size", 2048,
-                "Textures larger than this are downscaled on load (VRAM).");
+                new ConfigDescription("Textures larger than this are downscaled on load (VRAM).", null, Advanced));
             HideModelAccessories = Config.Bind("Visual", "Hide model accessories", true,
-                "Hide materials of weapons/guns/bags authored into the model (she should carry the in-game weapon instead).");
+                new ConfigDescription("Hide materials of weapons/guns/bags authored into the model (she should carry the in-game weapon instead).", null, Advanced));
             HideModelAccessoriesList = Config.Bind("Visual", "Hide accessories name filter", "gun, glock, bag, butt, weapon, silencer",
-                "Case-insensitive substrings: a material whose name or texture path contains any is hidden.");
+                new ConfigDescription("Case-insensitive substrings: a material whose name or texture path contains any is hidden.", null, Advanced));
             PmxYaw = Config.Bind("Visual", "Model facing yaw (deg)", 180f,
-                "Yaw applied to the model relative to the player's forward. PMX models face -Z, so 180 makes them face forward.");
+                new ConfigDescription("Yaw applied to the model relative to the player's forward. PMX models face -Z, so 180 makes them face forward.", null, Advanced));
             IdleCacheSize = Config.Bind("Visual", "Idle cache size", 4,
-                new ConfigDescription("Idle parsed-character cache capacity (LRU). Browsing more characters than this re-parses the evicted package on the next switch (a 250-460ms hitch); bigger values keep more models warm at the cost of texture VRAM.", new AcceptableValueRange<int>(2, 24)));
+                new ConfigDescription("Idle parsed-character cache capacity (LRU). Browsing more characters than this re-parses the evicted package on the next switch (a 250-460ms hitch); bigger values keep more models warm at the cost of texture VRAM.", new AcceptableValueRange<int>(2, 24), Advanced));
             PmxAssets.SetIdleCap(IdleCacheSize.Value);
             IdleCacheSize.SettingChanged += (_, __) => PmxAssets.SetIdleCap(IdleCacheSize.Value);
             ReplaceBody.SettingChanged += (_, __) =>
@@ -103,11 +110,11 @@ namespace DollFrame
             EnableRimLight = Config.Bind("Visual", "Enable rim light", true,
                 "啟用角色環境自適應邊緣光（Rim Light）與布料／絲襪掠射光澤（DollFrame/CharacterPBR Shader）。");
             RimLightIntensity = Config.Bind("Visual", "Rim light intensity", 0.65f,
-                new ConfigDescription("邊緣光強度倍率（0 = 關閉，建議 0.4–1.2）。", new AcceptableValueRange<float>(0f, 2.5f)));
+                new ConfigDescription("邊緣光強度倍率（0 = 關閉，建議 0.4–1.2）。", new AcceptableValueRange<float>(0f, 2.5f), Advanced));
             RimLightPower = Config.Bind("Visual", "Rim light sharpness", 3.2f,
-                new ConfigDescription("邊緣光收斂銳利度（越大越貼近輪廓邊緣）。", new AcceptableValueRange<float>(0.8f, 8.0f)));
+                new ConfigDescription("邊緣光收斂銳利度（越大越貼近輪廓邊緣）。", new AcceptableValueRange<float>(0.8f, 8.0f), Advanced));
             RimLightColor = Config.Bind("Visual", "Rim light tint", new Color(0.85f, 0.93f, 1.0f, 1.0f),
-                "邊緣光全域色調疊加。");
+                new ConfigDescription("邊緣光全域色調疊加。", null, Advanced));
             EnableRimLight.SettingChanged += (_, __) => ShaderManager.ApplyGlobalRimSettings();
             RimLightIntensity.SettingChanged += (_, __) => ShaderManager.ApplyGlobalRimSettings();
             RimLightPower.SettingChanged += (_, __) => ShaderManager.ApplyGlobalRimSettings();

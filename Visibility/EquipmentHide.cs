@@ -136,7 +136,7 @@ namespace DollFrame.Visibility
 
             var parentedGo = sv.ParentedModel != null ? sv.ParentedModel.Value : null;
             var modelGo = sv.Model;
-            if (skipItem != null && (IsUnderWeaponRoot(parentedGo) || IsUnderWeaponRoot(modelGo)))
+            if (IsUnderWeaponRoot(parentedGo) || IsUnderWeaponRoot(modelGo))
                 return;
 
             if (parentedGo != null) AddRenderersInChildren(parentedGo, into);
@@ -212,7 +212,7 @@ namespace DollFrame.Visibility
 
         private static void AddIfValid(Renderer r, HashSet<Renderer> into)
         {
-            if (r != null && (r.name == null || !r.name.StartsWith("DollFrame_", StringComparison.Ordinal)))
+            if (r != null && (r.name == null || !r.name.StartsWith("DollFrame_", StringComparison.Ordinal)) && !IsUnderWeaponRoot(r.gameObject))
                 into.Add(r);
         }
     }

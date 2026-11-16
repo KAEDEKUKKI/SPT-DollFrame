@@ -432,7 +432,7 @@ namespace DollFrame
 
             // independent rig on the preview skeleton (menu keeps no ground offset, as before)
             var menuMetrics = ModelMetrics.Compute(assets.Model, Plugin.PmxUnitScale.Value, menuDump);
-            var previewScale = ModelScaleMath.Solve(menuMetrics.Factors);
+            var previewScale = ModelScaleMath.Solve(menuMetrics.Factors, menuMetrics.HeightM);
             _rig = CharacterRig.Build(skel, games, assets,
                 Plugin.PmxUnitScale.Value, Plugin.PmxYaw.Value, Plugin.PmxYOffset.Value,
                 skel.gameObject.layer,

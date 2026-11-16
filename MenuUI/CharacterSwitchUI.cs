@@ -278,7 +278,7 @@ namespace DollFrame
         {
             if (Plugin.Character != null) _lastApplied = Plugin.Character.Value ?? string.Empty;
             if (_rowBLabel != null)
-                _rowBLabel.text = $"DollFrame 角色：{(Plugin.Character != null ? Plugin.Character.Value : "-")}";
+                _rowBLabel.text = Plugin.Character != null ? Plugin.Character.Value : "-";
         }
     }
 }

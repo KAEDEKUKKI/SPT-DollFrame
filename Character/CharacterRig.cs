@@ -207,7 +207,8 @@ namespace DollFrame
             ModelScaleMath.ScalePlan? scalePlan = null;
             if (spanFactors != null)
             {
-                scalePlan = ModelScaleMath.Solve(spanFactors);
+                float heightM = pmx != null ? (pmx.BoundsMax.y - pmx.BoundsMin.y) * unitScale : 0f;
+                scalePlan = ModelScaleMath.Solve(spanFactors, heightM);
                 if (scalePlan.HasValue)
                 {
                     var scaled = ModelScaler.Apply(root, scalePlan.Value);
