@@ -1,160 +1,207 @@
-# DollFrame
+<p align="center">
+  <img src="AK-12%20%E7%B4%AB%E8%AA%BF%E3%83%86%E3%83%83%E3%82%AF%E3%82%A8%E3%83%B3%E3%83%96%E3%83%AC%E3%83%A0.png" alt="DollFrame Logo" width="220" />
+</p>
 
-> 面向 SPTarkov 的模組化角色替換框架 — PMX 角色模型導入、IK 重定向、PBR/SDF 著色與語音替換。
+<h1 align="center">DollFrame</h1>
 
-DollFrame 是 SPTarkov 的 BepInEx 客戶端模組,將自訂 PMX(MMD)角色模型以 `.gfc` 角色包導入遊戲:為每個角色建立獨立骨架(rig),逐幀鏡射原版動畫機,以兩骨 IK 重定向手臂至持械姿態,並提供語音替換、次要物理、自訂 PBR/SDF 著色與裝備視覺隱藏。另附一個僅顯示載入資訊的伺服端 companion(無遊戲邏輯)。
+<p align="center">
+  <strong>Modular PMX Character Replacement Framework for SPTarkov — Direct PMX Folder Loading, Independent Rig, Two-Bone Arm IK, PBR/SDF Shading, Secondary Physics &amp; Voice Replacement.</strong>
+</p>
 
-模組識別:`DollFrame`(BepInEx GUID/Harmony id/日誌行前綴 `[DollFrame]`),根命名空間 `DollFrame`,版本 `0.3.18`。
+<p align="center">
+  <a href="README.md">English</a> |
+  <a href="README.zh-TW.md">繁體中文</a> |
+  <a href="README.ja.md">日本語</a>
+</p>
 
-- **預設零干擾**:`Replace player body` 預設 off — off 時模組不對戰局玩家做任何寫入,動作與視角完全原生;主選單 3D 預覽與角色卡不受影響。
-- **原版骨架零侵入**:不修改遊戲骨架的本地平移/旋轉,不覆寫攝影機與開鏡(ADS)視角。
-- **零拉伸契約**:每幀僅寫入 `localRotation`,模型側只在 rig 根套用一次腿錨定單一等比縮放,手指與比例保持作者原始。
+---
 
-## 功能特性
+## Badges
 
-- **角色替換**:選用 `.gfc` 角色包建構獨立 rig,含模型側單一等比縮放與移動膠囊補償;LRU 快取(預設保溫 4 位)降低切換卡頓。
-- **手臂 IK**:`IK arm retarget to game hands`(預設 on)時,持械態以兩骨 IK 求解上臂/前臂、胸腔局部空間 pole 與 SDF 防穿模;空手態自然垂手、十指回作者原始姿態;死亡/布娃娃自動回退 FK 鏡射。
-- **語音替換**:`Replace player voice`(預設 on)依所選角色家族載入語音,切回 `Vanilla (PMC)` 自動還原原版語音。
-- **次要物理**:頭髮、裙擺、衣襬、胸部彈性,含頭/頸/胸腔/腰腹/骨盆/四肢的身體膠囊碰撞防穿模與嚴格零拉伸;前瀏海固定不動。
-- **渲染**:全身原 `Standard` PBR 基礎 + 束內 `DollFrame/CharacterPBR` 著色器的環境自適應邊緣光(Rim Light,可調強度/銳度/色調)+ SDF 臉部陰影;第一人稱頭部切 `ShadowsOnly` 防穿相機。
-- **裝備視覺隱藏**:8 個槽位(護甲/戰術背心/背包/頭盔/面罩/眼睛/耳機/臂章)資料級快照清空,實際屬性不變。
-- **選單 UI**:角色屬性「全般(Overall)」畫面的 `DollFrame 角色:` ◀ ▶ 切換列(即時重掃新包,免重啟)、主選單 `PageUp` 快速循環、跳蚤市場角色卡圖示、主選單 3D 預覽。
+<p align="center">
+  <img src="https://img.shields.io/badge/Version-0.4.1-7c4dff?style=for-the-badge" alt="Version 0.4.1" />
+  <img src="https://img.shields.io/badge/SPTarkov-~4.1.6-blue?style=for-the-badge" alt="SPTarkov ~4.1.6" />
+  <img src="https://img.shields.io/badge/Platform-BepInEx%205%20%7C%20.NET%20Standard%202.1-success?style=for-the-badge" alt="Platform" />
+  <img src="https://img.shields.io/badge/License-All%20Rights%20Reserved-lightgrey?style=for-the-badge" alt="License" />
+</p>
 
-## 環境需求
+---
 
-- [SPTarkov](https://www.sp-tarkov.com/) **~4.1.3**(伺服端 companion 宣告的測試基準)
-- BepInEx + 0Harmony(隨 SPT 內建)
-- 自行建置才需要:.NET SDK(客戶端 `netstandard2.1`;驗證 harness net8.0)
+## Overview
 
-## 安裝
+**DollFrame** is a BepInEx client-side framework for [SPTarkov](https://www.sp-tarkov.com/) that directly loads custom **PMX (MMD)** 2.0 character folders (`.pmx` + textures) at runtime without requiring proprietary archive packing. For each character, DollFrame constructs an independent skinned rig under the player's `Root_Joint`, mirrors the vanilla animation pose every frame, retargets arms onto in-game weapons with a two-bone IK solver, and provides automatic `.wav` voice replacement, secondary spring physics, custom PBR/SDF shaders, and non-destructive equipment hiding. An optional lightweight server companion (`DollFrame.Server.dll`) is included solely to display load metadata on the SPT server console.
 
-| 內容 | 遊戲目錄內的位置 |
+### Design Philosophy
+
+- **Non-Intrusive by Default**: `Replace player body` defaults to `false`. While off, DollFrame performs zero writes to the in-raid/hideout player, while main menu 3D preview and trading card icons remain active.
+- **Zero Writes to Vanilla Skeleton**: Never mutates `SkeletonRootJoint` or `SkeletonHands` transforms, and never overrides the camera or ADS view.
+- **Zero-Stretch Contract**: Every frame writes only `localRotation` (with uniform leg-anchored scale `k` applied once at rig root during `Build`).
+
+---
+
+## Features
+
+- **Direct PMX 2.0 Folder Loading & Scaling**: Scans unpacked character folders containing `.pmx` models, splits body/head meshes at load time, applies leg-anchored uniform proportion scaling with capsule height/center compensation, and caches parsed assets in an LRU cache (default 4 models).
+- **Two-Bone Arm IK & Finger Snapping**: Retargets upper arm and forearm to in-game palm anchors with chest SDF anti-clipping, `< 0.05 cm` wrist grip convergence, and progressive finger curl snapping so fingertips wrap cleanly around weapon grips.
+- **Natural Unarmed Arm Pose**: Relaxed elbow bend, gentle wrist cup, graduated open-hand finger curl, and gait-coupled arm swing when unarmed; automatically falls back to pure FK mirroring on death/ragdoll.
+- **Voice Replacement & Loudness Normalization**: Hooks `BaseSpeaker.Init` / `ReplaceVoice` to load `.wav` voice banks (`Voices/<Family>/<Trigger>/`) matching the selected character and restores vanilla PMC voices when switching back to `Vanilla (PMC)`. Built-in RMS loudness normalization with soft-clipping prevents quiet voice packs from being drowned out by gunfire.
+- **Secondary Physics**: Zero-stretch spring physics for hair, skirts, ribbons, coat tails, and bust with body-capsule collision (bangs stay fixed).
+- **Custom PBR / SDF Rendering**: `DollFrame/CharacterPBR` shaders (`dollframe_shaders.bundle`, with Unity `Standard` fallback) featuring environment-adaptive rim lighting, fabric/stocking sheen, SDF facial shading, and automatic `ShadowsOnly` head masking in first-person.
+- **8-Slot Equipment Visual Hiding & Accessory Filtering**: Hides vanilla armor, tactical rig, backpack, headwear, face cover, eyewear, earpiece, and armband (including `Dress`-skinned headgear) plus holstered weapons without altering actual item stats, with immediate weapon-switch sync so active weapons are never hidden. Also filters out built-in PMX weapon/bag materials.
+- **In-Game Menu UI**: `DollFrame:` ◀ ▶ selector row on the **Overall** character screen (hot-rescans new `.pmx` folders without restarting), main menu 3D preview, and custom trading card icon rendering.
+
+---
+
+## Screenshots
+
+![DollFrame In-Game Preview](Screenshots/Screenshots-1.png)
+
+---
+
+## Requirements
+
+- **[SPTarkov](https://www.sp-tarkov.com/)**: `~4.1.6`
+- **BepInEx 5 + 0Harmony**: Bundled with SPTarkov
+- **.NET SDK** *(only required if building from source)*: `.NET Standard 2.1` (client) / `.NET 8.0+` (server companion)
+
+---
+
+## Installation
+
+1. Download or build the release package.
+2. Copy the client files into your SPTarkov directory:
+
+| Component | Target Path in SPTarkov Directory |
 |---|---|
 | `DollFrame.dll` + `dollframe_shaders.bundle` | `BepInEx/plugins/DollFrame/` |
-| 角色包 `*.gfc` | `BepInEx/plugins/DollFrame/DollFrame_Characters/` |
-| 語音包 | `BepInEx/plugins/DollFrame/DollFrame_Voices/<角色家族>/*.wav` 或單檔 `*.gf2v` 歸檔 |
-| 伺服端 companion(`DollFrame.Server.dll`) | `user/mods/DollFrame/`(選用,僅載入資訊) |
+| Character folders (`<Name>/*.pmx` + textures) | `BepInEx/plugins/DollFrame/Characters/` |
+| Voice packs (`<Family>/<Trigger>/*.wav`) | `BepInEx/plugins/DollFrame/Voices/` |
+| Server companion (`DollFrame.Server.dll`, optional) | `user/mods/DollFrame/` |
 
-> 角色包與語音包也會從 `BepInEx/plugins/` 下任何含 `Characters`/`DollFrame_Characters`(或 `Voices`/`DollFrame_Voices`)子資料夾的內容包掃入。`.gfc` 圖形與語音為**預建完成資產**;重打包/語音產製不在本 repo 範疇。
+3. Launch the game, open **Character → Overall** in the main menu to pick a character using the `DollFrame` row, and enable `Visual → Replace player body` in **F12** (Configuration Manager) when you want the replacement active in raids and hideout.
 
-## 快速上手
+---
 
-1. 主選單進入角色屬性的**全般(Overall)**畫面,以 `DollFrame 角色:` 列的 ◀ ▶ 選擇角色(新 `.gfc` 檔放入資料夾即出現,無需重啟)。
-2. 或在主選單按 **`PageUp`** 逐個循環切換(僅主選單有效,戰局/藏身處 session 中忽略)。
-3. 要在戰局中實際替換,開啟設定(`F12` → `DollFrame`)將 `Visual / Replace player body` 設為 on — 變更對下次掛載生效。
-4. 其餘行為(語音、膠囊、IK、物理、邊緣光、裝備隱藏)都在設定檔分區中,見下表。
+## Configuration
 
-## 設定項
+Config file: `BepInEx/config/DollFrame.cfg` (editable in-game via **F12**).
 
-設定檔:`BepInEx/config/DollFrame.cfg`(BepInEx 依 GUID 自動產生;遊戲內 `F12` 可編輯)。共 31 項,四大分區:
+### Scaling & Capsule
 
-### Scaling / Capsule
-
-| 鍵 | 預設 | 說明 |
+| Key | Default | Description |
 |---|---|---|
-| `Apply to own player` | `true` | 對本地玩家骨架套用縮放 |
-| `Height multiplier` | `1.0` | 推導膠囊時對模型原始高度的倍率(`0` 還原原版膠囊) |
-| `Scale capsule` | `true` | 依縮放後身高補償 CharacterController 膠囊(Unity 不讀 transform scale) |
+| `Apply to own player` | `true` | Apply scaling to your own player skeleton. |
+| `Height multiplier` | `1.0` | Multiplier on the model's authored height when deriving the capsule (`0` restores the vanilla PMC capsule). |
+| `Scale capsule` | `true` | Compensates `CharacterController` / `CapsuleCollider` height and center to match the scaled model height. |
 
 ### Visual
 
-| 鍵 | 預設 | 說明 |
+| Key | Default | Description |
 |---|---|---|
-| `Replace player body` | `false` | 戰局中以角色包替換身體;off 時模組對玩家零寫入 |
-| `Character` | — | 所選角色(本視窗隱藏;於 Overall 切換列或 PageUp 切換,持久化於此) |
-| `Switch character key` | `PageUp` | 主選單快速循環熱鍵(僅主選單生效) |
-| `PMX unit scale` | `0.078` | 每個 PMX 單位的公尺數(MMD 慣例 1u = 8 cm) |
-| `Model Y offset (m)` | `0` | 模型浮起/陷入地面時的垂直修正 |
-| `Max texture size` | `2048` | 載入時降採樣過大紋理(控 VRAM) |
-| `Flip UV` | `true` | PMX(DirectX V 軸向下)與 Unity(UV 向上)翻轉;貼圖顛倒才關 |
-| `Hide model accessories` | `true` | 隱藏模型內建武器/背包等材質 |
-| `Hide accessories name filter` | `gun, glock, bag, …` | 忽略大小寫子字串判定要隱藏的材質 |
-| `Model facing yaw (deg)` | `180` | PMX 模型面 -Z,180 使其面向玩家前方 |
-| `Idle cache size` | `4`(2–24) | 已解析角色的 LRU 快取容量;越大保溫越多、佔用越多 VRAM |
-| `Scale model to game proportions` | `true` | Build 期於 rig 根一次套用腿錨定等比縮放 k |
-| `Hide head in first person` | `true` | 第一人稱頭部 `ShadowsOnly`(保留地面陰影) |
-| `IK arm retarget to game hands` | `true` | 持械兩骨 IK 重定向;Build 時讀取,變更需重新掛載 |
-| `Replace player voice` | `true` | 依角色家族替換語音;Vanilla 時還原 |
-| `Enable secondary physics` | `true` | 頭髮/裙擺/衣襬/胸部次要物理(前瀏海固定) |
-| `Enable rim light` | `true` | 環境自適應邊緣光與布料/絲襪掠射光澤 |
-| `Rim light intensity` | `0.65`(0–2.5) | 邊緣光強度(0 = 關) |
-| `Rim light sharpness` | `3.2`(0.8–8) | 邊緣光貼合輪廓的收斂銳利度 |
-| `Rim light tint` | `(0.85, 0.93, 1.0)` | 邊緣光全域色調 |
+| `Replace player body` | `false` | Replace the player body in raids/hideout. When `false`, zero writes are performed on the raid player. |
+| `Character` | *(auto)* | Selected character folder name (hidden in F12; switch via the menu **Overall** screen). |
+| `PMX unit scale` | `0.078` | Meters per PMX unit (MMD convention: `1u ≈ 8 cm`). |
+| `Model Y offset (m)` | `0` | Vertical offset correction if a model floats or sinks slightly. |
+| `Max texture size` | `2048` | Textures exceeding this dimension are downscaled on load to save VRAM. |
+| `Hide model accessories` | `true` | Hide built-in weapons/bags authored inside the PMX model. |
+| `Hide accessories name filter` | `gun, glock, bag, butt, weapon, silencer` | Case-insensitive substrings used to identify accessory materials/textures to hide. |
+| `Model facing yaw (deg)` | `180` | Yaw rotation relative to player forward (`180` aligns `-Z`-facing PMX models forward). |
+| `Idle cache size` | `4` (`2–24`) | LRU cache capacity for parsed character assets. Higher values reduce switch stutter at the cost of VRAM. |
+| `Replace player voice` | `true` | Automatically load matching character voices and restore vanilla PMC voice when set to `Vanilla (PMC)`. |
+| `Enable secondary physics` | `true` | Enable spring physics for hair, skirts, ribbons, coats, and bust with body-capsule collision. |
+| `Enable rim light` | `true` | Enable environment-adaptive rim lighting and fabric sheen. |
+| `Rim light intensity` | `0.65` (`0–2.5`) | Global rim light intensity multiplier (`0` disables rim light). |
+| `Rim light sharpness` | `3.2` (`0.8–8.0`) | Rim light falloff sharpness toward silhouette edges. |
+| `Rim light tint` | `(0.85, 0.93, 1.0, 1.0)` | Global rim light color tint. |
 
-### Equipment(8 鍵,皆預設 `true`)
+### Equipment (8 keys, all default `true`)
 
-| 鍵 | 說明 |
+| Key | Default | Description |
+|---|---|---|
+| `Hide armor on replaced bodies` | `true` | Hide PMC armor visuals on replaced bodies (menu, raid, FP, card). |
+| `Hide tactical rig on replaced bodies` | `true` | Hide PMC tactical rig visuals. |
+| `Hide backpack on replaced bodies` | `true` | Hide PMC backpack visuals. |
+| `Hide headwear on replaced bodies` | `true` | Hide PMC headwear/helmets (including `Dress`-skinned models). |
+| `Hide face cover on replaced bodies` | `true` | Hide PMC face covers/masks. |
+| `Hide eyewear on replaced bodies` | `true` | Hide PMC eyewear. |
+| `Hide earpiece on replaced bodies` | `true` | Hide PMC headsets/earpieces. |
+| `Hide armband on replaced bodies` | `true` | Hide PMC armbands. |
+
+---
+
+## Character Packages
+
+- **Character Folders (`*.pmx`)**: Place each character in its own subfolder containing a `.pmx` (version 2.0) model and its textures under `BepInEx/plugins/DollFrame/Characters/<CharacterName>/` (or `DollFrame_Characters/`). DollFrame also scans sibling plugin folders under `BepInEx/plugins/` that contain `Characters/`, `DollFrame_Characters/`, `Voices/`, or `DollFrame_Voices/` subdirectories, allowing standalone content packs.
+- **Voice Packs (`*.wav`)**: Place `.wav` files (16-bit PCM or 32-bit float) organized by `EPhraseTrigger` subfolders inside `Voices/<CharacterFamily>/<TriggerName>/*.wav` (e.g., `OnFight/`, `NeedMedkit/`, `OnBeingHurt/`). Longest-prefix matching pairs character variants automatically (e.g., `AK12_Skin` matches `Voices/AK12/`).
+
+---
+
+## Troubleshooting
+
+| Symptom | Solution |
 |---|---|
-| `Hide armor / tactical rig / backpack / headwear / face cover / eyewear / earpiece / armband on replaced bodies` | 隱藏該槽位的 PMC 裝備視覺(選單身體、戰局身體、FP viewmodel、角色卡),資料級快照、不動實際屬性 |
+| Character does not appear in Overall row | Ensure the character subfolder contains a `.pmx` file inside `BepInEx/plugins/DollFrame/Characters/` (or a sibling pack's `Characters/` folder). |
+| Model floats or sinks into floor | Adjust `Visual → Model Y offset (m)`. |
+| Stutter when browsing characters | Increase `Visual → Idle cache size` to keep more parsed models warm in memory. |
+| High VRAM usage | Lower `Visual → Max texture size` (e.g., `1024`) or `Idle cache size`. |
+| Custom voice not playing | Verify folder structure `Voices/<Family>/<EPhraseTrigger>/*.wav` and ensure `Replace player voice` is enabled. |
+| Shader effects missing (looks plain) | Confirm `dollframe_shaders.bundle` is located next to `DollFrame.dll` in `BepInEx/plugins/DollFrame/`. |
+| Checking runtime logs | Search `BepInEx/LogOutput.log` for `[DollFrame]`. |
 
-## 運作原理
+---
 
+## Architecture
+
+```text
+Plugin.cs                      # BepInEx entry point, 26 config bindings, folder scanner, Harmony patches
+├── Character/
+│   ├── PmxRuntime.cs          # PMX 2.0 parser, texture loader, PmxAssets LRU cache
+│   ├── MeshSplitter.cs        # Load-time body/head mesh splitting
+│   ├── CharacterRig.cs        # Rig builder & per-frame Drive (localRotation-only)
+│   ├── GameBones.cs           # Vanilla skeleton anchor resolver (raid & preview)
+│   ├── BoneContract.cs        # PureDelta / PureRel bone contracts & digit mappings
+│   ├── ModelMetrics.cs / ModelScaler.cs  # Span measurement & uniform root scaling
+│   ├── Kinematics/            # Pure math: TwoBoneIk, ArmGrabIk, ArmRest, RigAim, SpringPhysics
+│   ├── ShaderManager.cs / SdfFaceShading.cs  # Shader bundle loader, rim light, facial SDF
+│   ├── VoiceReplacer.cs       # WAV loader, RMS loudness normalizer, BaseSpeaker hooks
+│   ├── Camera/FirstPersonSMRMask.cs          # First-person head ShadowsOnly masking
+│   └── BodyReplacer.cs / Patches.cs / CapsulePatches.cs / IkRefresh.cs
+├── Visibility/                # VanillaBodyHider, EquipmentHide (8-slot + Dress), AccessoryFilter, VanillaSelection
+├── MenuUI/                    # CharacterSwitchUI (Overall row), PreviewProxy, TradingCardIcon
+├── Shaders/                   # Prebuilt dollframe_shaders.bundle
+└── ServerMod/                 # Optional SPT server metadata companion
 ```
-Plugin.cs                 # BepInEx 入口:31 項設定、包掃描、Harmony 容器註冊、PageUp 循環
-├── Character/            # 引擎核心
-│   ├── PmxRuntime.cs     # PMX/貼圖載入與 LRU 快取(PmxAssets)
-│   ├── MeshSplitter.cs   # 載入期拆分頭/身網格
-│   ├── CharacterRig.cs   # 獨立 rig Build 與每幀 Drive(僅寫 localRotation)
-│   ├── GameBones.cs      # 遊戲骨骼錨點解析(戰局與選單預覽共用)
-│   ├── BoneContract.cs / BindMath.cs      # 骨骼契約與綁定座標數學
-│   ├── ModelMetrics.cs / ModelScaler.cs   # 解剖跨距量測與單一等比縮放
-│   ├── Kinematics/       # 純數學:TwoBoneIk、ArmGrabIk、ArmRest、RigAim、SpringPhysics
-│   ├── ShaderManager.cs / SdfFaceShading.cs # 束載入、全域邊緣光、臉部 SDF
-│   ├── VoiceReplacer.cs  # 語音載入與還原
-│   ├── Camera/FirstPersonSMRMask.cs       # 第一人稱頭部渲染模式
-│   └── Contract/  + Patches.cs / CapsulePatches.cs / IkRefresh.cs
-├── Visibility/           # 原版素體隱藏、8 槽裝備隱藏、Vanilla 判準、防閃白
-├── MenuUI/               # Overall 切換列、主選單預覽、角色卡
-├── Shaders/              # dollframe_shaders.bundle(預建)+ UnityBuilder 來源專案
-└── ServerMod/            # 伺服端 companion(僅載入資訊)
-```
 
-核心不變量(契約,不因改版放寬):
+---
 
-1. **遊戲骨架零寫入** — 只在玩家 `Root_Joint` 下自建 rig,原版骨架與攝影機/ADS 不被改動。
-2. **每幀僅寫 `localRotation`** — 零 `localPosition`/`localScale` 幀寫;縮放唯一合法寫入點是 Build 期 rig 根。
-3. **死亡安全** — 死亡/布娃娃自動回退純 FK 鏡射;切換僅在主選單允許,不會 mid-session 生效。
-4. **日誌契約** — 全部日誌行以 `[DollFrame]` 前綴、行族固定,`tools/check-log.sh` 以 fixtures 逐點釘死(bad.log 對應 exit 1)。
+## Development
 
-## 疑難排解
-
-| 症狀 | 處置 |
-|---|---|
-| Overall 列看不到某角色 | 確認 `.gfc` 在 `DollFrame_Characters/`(該列即掃);熱鍵循環名單需重啟遊戲後更新 |
-| 模型浮起/陷入地面 | 調 `Model Y offset (m)` |
-| 貼圖上下顛倒 | 關閉 `Flip UV` |
-| 切換卡頓 | 提高或降低 `Idle cache size`(LRU 重解析會有 250–460 ms 停頓) |
-| VRAM 偏高 | 降低 `Max texture size` 或 `Idle cache size` |
-| 手臂/持槍異常 | 確認 `IK arm retarget to game hands` 設定;變更後需切換角色或重進戰局 |
-| 日誌診斷 | `bash tools/check-log.sh <遊戲目錄>/BepInEx/LogOutput.log`;行前綴 `[DollFrame]` |
-
-## 開發
+1. Configure `UserSettings.props` with your `SPTTarkovDirectory` path.
+2. Build commands:
 
 ```bash
-# 建置(依 UserSettings.props 的 SPTTarkovDirectory 自動部署至 BepInEx/plugins/DollFrame/)
-dotnet build -c Release
-
-# 純驗證建置(不拷貝至遊戲目錄;預期 0 警告 0 錯誤)
+# Verification build only (0 warnings, 0 errors)
 dotnet build -c Release -p:CopyOutputToBepInEx=false
 
-# 離線驗證 harness(15 個子命令,不需遊戲 session)
-dotnet build Tests/DollFrame.Verify.csproj
-DOTNET_ROLL_FORWARD=LatestMajor dotnet Tests/bin/Debug/net8.0/DollFrameVerify.dll
+# Build and deploy DollFrame.dll + dollframe_shaders.bundle to BepInEx/plugins/DollFrame/
+dotnet build -c Release
 
-# 執行日誌合約檢查
-bash tools/check-log.sh <遊戲目錄>/BepInEx/LogOutput.log
+# Build optional server companion
+dotnet build ServerMod/DollFrame.Server.csproj -c Release
 ```
 
-- 部署設定在 `UserSettings.props`(`SPTTarkovDirectory` 指向 SPT 目錄;`CopyOutputToBepInEx=true` 時 Build 後自動拷貝 dll 與著色束)。
-- 驗證 harness 環境鈕:`DOLLFRAME_PACKAGES_DIR` / `DOLLFRAME_PACKAGES` / `DOLLFRAME_SCALE_DELTA` / `DOLLFRAME_EXPECT_DELTA`;雙編譯 define `DOLLFRAME_PMX_PARSER_ONLY`。
-- 伺服端 companion:`dotnet build ServerMod/DollFrame.Server.csproj`(MSBuild 屬性 `SPT_DIR` 指向 SPT 伺服目錄,部署至 `user/mods/DollFrame/`),版本由 assembly 版本推導(單一真值)。
-- 本 repo 範疇 = **執行期 + 離線驗證**;`.gfc`/語音為預建部署資產,產製鏈在 repo 外。
+---
 
-## 相關文件
+## Roadmap
 
-- [`CHANGELOG.md`](CHANGELOG.md) — 完整版本演進與驗證紀錄
-- [`AGENTS.md`](AGENTS.md) — AI 代理人之架構契約與硬性不變量精簡規範
+- [x] **v0.4.0–0.4.1**: Hideout floor fall-through fix, full-module lifecycle/memory-leak hardening, `Dress`-skinned headgear hiding (`Headwear`/`Earpiece`/`FaceCover`), immediate weapon-switch visibility sync, `< 0.05 cm` wrist grip convergence, finger curl snapping, natural unarmed arm pose, voice RMS loudness normalization, and streamlined configuration.
+- [ ] **Future**: In-game per-character voice volume/pitch presets, expanded trigger bank aliases, and additional stylized shader presets.
 
-## 授權
+---
 
-**All rights reserved** © kukki(見 `ServerMod/ModMetadata.cs` 之模組宣告)。
+## Credits & License
+
+- **Author**: `kukki`
+- **Powered By**: [SPTarkov](https://www.sp-tarkov.com/), [BepInEx](https://github.com/BepInEx/BepInEx), [Harmony](https://github.com/pardeike/Harmony)
+- **Related Docs**: [`CHANGELOG.md`](CHANGELOG.md) · [`AGENTS.md`](AGENTS.md)
+- **License**: **All rights reserved** © `kukki` (see [`ServerMod/ModMetadata.cs`](ServerMod/ModMetadata.cs)).

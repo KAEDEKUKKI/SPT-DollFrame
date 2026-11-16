@@ -10,6 +10,7 @@ namespace DollFrame
     {
         internal static void RefreshIK(Player player)
         {
+            if (player == null) return;
             try
             {
                 Toggle(GetBehaviour(player, "_fbbik"));
@@ -49,7 +50,7 @@ namespace DollFrame
 
         private static void Toggle(Behaviour c)
         {
-            if (c == null) return;
+            if (c == null || !c.enabled) return;
             c.enabled = false;
             c.enabled = true;
         }

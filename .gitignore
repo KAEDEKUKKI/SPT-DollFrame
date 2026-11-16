@@ -46,3 +46,4 @@ Proof/
 bug/
 *.log
 !tools/fixtures/*.log
+UserSettings.props

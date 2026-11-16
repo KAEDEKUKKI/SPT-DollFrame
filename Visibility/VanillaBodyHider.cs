@@ -13,11 +13,13 @@ namespace DollFrame
     /// </summary>
     internal sealed class VanillaBodyHider
     {
-        // 原版身體渲染器 -> 原始陰影模式（釋放時完整還原）
-        private readonly Dictionary<Renderer, ShadowCastingMode> _hidden =
-            new Dictionary<Renderer, ShadowCastingMode>();
+        // 原版身體渲染器 -> 原始陰影模式與啟用狀態（釋放時完整還原）
+        private readonly Dictionary<Renderer, (ShadowCastingMode mode, bool enabled)> _hidden =
+            new Dictionary<Renderer, (ShadowCastingMode mode, bool enabled)>();
         private readonly HashSet<Renderer> _scratch = new HashSet<Renderer>();
         private readonly List<Renderer> _released = new List<Renderer>();
+        private static readonly List<SkinnedMeshRenderer> _smrBuf = new List<SkinnedMeshRenderer>(16);
+        private static readonly List<MeshRenderer> _mrBuf = new List<MeshRenderer>(16);
 
 
         // 還原路徑的一次性警告旗標（_operWarned 欄位模式；static 因 RestoreAllVanilla 為 static）
@@ -41,15 +43,16 @@ namespace DollFrame
             {
                 if (r != null)
                 {
-                    r.shadowCastingMode = _hidden[r];
-                    r.enabled = true;
+                    var orig = _hidden[r];
+                    r.shadowCastingMode = orig.mode;
+                    r.enabled = orig.enabled;
                 }
                 _hidden.Remove(r);
             }
 
             foreach (var r in _scratch)
             {
-                if (!_hidden.ContainsKey(r)) _hidden[r] = r.shadowCastingMode;
+                if (!_hidden.ContainsKey(r)) _hidden[r] = (r.shadowCastingMode, r.enabled);
                 if (r.enabled) r.enabled = false;
                 if (r.shadowCastingMode != ShadowCastingMode.Off) r.shadowCastingMode = ShadowCastingMode.Off;
             }
@@ -75,8 +78,11 @@ namespace DollFrame
             // 重要：排除第一人稱 SkeletonHands（Weapon_root_anim）子樹，第一人稱維持原生 FP 手臂，
             // 避免每幀與 EFT 互搶 enabled 權限導致「若影若現的手」。
             var handsRoot = body != null && body.SkeletonHands != null ? body.SkeletonHands.transform : null;
-            foreach (var smr in player.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            _smrBuf.Clear();
+            player.GetComponentsInChildren(true, _smrBuf);
+            for (int i = 0; i < _smrBuf.Count; i++)
             {
+                var smr = _smrBuf[i];
                 if (smr == null) continue;
                 if (handsRoot != null && smr.transform.IsChildOf(handsRoot)) continue;
                 if (UnderAncestorSnippet(smr.transform, "Weapon_root_anim")) continue;
@@ -84,8 +90,11 @@ namespace DollFrame
                     into.Add(smr);
             }
             // Hide vanilla pants pistol_holster static mesh attached under Pants_*
-            foreach (var mr in player.GetComponentsInChildren<MeshRenderer>(true))
+            _mrBuf.Clear();
+            player.GetComponentsInChildren(true, _mrBuf);
+            for (int i = 0; i < _mrBuf.Count; i++)
             {
+                var mr = _mrBuf[i];
                 if (mr != null && mr.name != null &&
                     mr.name.IndexOf("pistol_holster", StringComparison.OrdinalIgnoreCase) >= 0 &&
                     UnderAncestorSnippet(mr.transform, "Pants_"))
@@ -116,8 +125,8 @@ namespace DollFrame
             foreach (var kv in _hidden)
             {
                 if (kv.Key == null) continue;
-                kv.Key.shadowCastingMode = kv.Value != ShadowCastingMode.Off ? kv.Value : ShadowCastingMode.On;
-                kv.Key.enabled = true;
+                kv.Key.shadowCastingMode = kv.Value.mode != ShadowCastingMode.Off ? kv.Value.mode : ShadowCastingMode.On;
+                kv.Key.enabled = kv.Value.enabled;
             }
             _hidden.Clear();
         }
@@ -157,10 +166,12 @@ namespace DollFrame
             }
             foreach (var r in player.GetComponentsInChildren<Renderer>(true))
             {
-                if (r == null || (r.name != null && r.name.StartsWith("DollFrame_"))) continue;
-                r.enabled = true;
+                if (r == null || (r.name != null && r.name.StartsWith("DollFrame_")) || UnderAncestorSnippet(r.transform, "DollFrame_")) continue;
                 if (r.shadowCastingMode == ShadowCastingMode.Off)
+                {
+                    r.enabled = true;
                     r.shadowCastingMode = ShadowCastingMode.On;
+                }
             }
 
         }

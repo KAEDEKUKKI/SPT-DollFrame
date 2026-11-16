@@ -88,6 +88,10 @@ namespace DollFrame
             internal int ArmIkSide = -1;       // 臂鏈 IK 側（0＝左、1＝右；ArmIkRole == None 時無效）
             internal bool HasFistCurl;         // 空手握拳局部旋轉是否已標定（解除 VisualPass HandPoser 扣扳機／托護木手勢）
             internal Snx.Quaternion FistCurlLocal = Snx.Quaternion.Identity;
+            internal float DigitSnapWeight;    // 持槍/持物指尖吸附收攏權重
+            internal float DigitHangWeight;    // 空手垂放手指漸進微彎權重
+            internal bool HasRelaxedWrist;     // 空手手腕自然微屈局部旋轉
+            internal Snx.Quaternion RelaxedWristLocal = Snx.Quaternion.Identity;
         }
 
         private readonly List<DriveEntry> _entries = new List<DriveEntry>();
@@ -455,6 +459,12 @@ namespace DollFrame
             games.TryGetValue("thigh1R", out rig._gameThighR);
             games.TryGetValue("calfR", out rig._gameKneeR);
 
+            // 0.3.9 臂鏈 IK capture（attach 一次性）：兩側左/右腕・左/右肘・左/右手首全解析時，
+            // 由 ArmRestMath.TryCalibrate 捕捉 ArmRestChain（具名掌錨＋chest-local pole＋收緊半徑）
+            // 並掛 ArmIk 面；並輸出 ik: 行族（單一 attach 行，單一生產者）＋節流閘初始化
+            SetupArmRest(rig, bones, anchorOf, true);
+            rig._ikTargetNext = Time.unscaledTime;
+
             // pose-parity sample table: every driven entry with its contract key, 3 lines
             // per attach (10 s apart, past the spawn transient)
             var parity = new List<(int entry, string key)>();
@@ -471,12 +481,6 @@ namespace DollFrame
             foreach (var (entry, key) in parity) rig._parityKeyOf[rig._entries[entry].PmxBone] = key;
             rig._parityLinesLeft = 3;
             rig._parityNext = Time.unscaledTime + 10f;
-
-            // 0.3.9 臂鏈 IK capture（attach 一次性）：兩側左/右腕・左/右肘・左/右手首全解析時，
-            // 由 ArmRestMath.TryCalibrate 捕捉 ArmRestChain（具名掌錨＋chest-local pole＋收緊半徑）
-            // 並掛 ArmIk 面；並輸出 ik: 行族（單一 attach 行，單一生產者）＋節流閘初始化
-            SetupArmRest(rig, bones, anchorOf, Plugin.ArmIkRetarget != null && Plugin.ArmIkRetarget.Value);
-            rig._ikTargetNext = Time.unscaledTime;
 
             // Pose the rig once before measuring ground contact: rest-pose bindposes and
             // IK local directions are already captured above, so evaluating the initial
@@ -590,6 +594,21 @@ namespace DollFrame
                                 palmInWorld = Snx.Vector3.Normalize(c);
                         }
                     }
+                    if (we != null && rig.Bones[wristIdx] != null)
+                    {
+                        var wristCurlWorld = Snx.Vector3.Cross(VecS(we.DirC), palmInWorld);
+                        if (wristCurlWorld.LengthSquared() > 1e-8f)
+                        {
+                            wristCurlWorld = Snx.Vector3.Normalize(wristCurlWorld);
+                            var wristCurlLocal = Snx.Vector3.Transform(wristCurlWorld, Snx.Quaternion.Inverse(QuatS(rig.Bones[wristIdx].rotation)));
+                            if (wristCurlLocal.LengthSquared() > 1e-8f)
+                            {
+                                we.RelaxedWristLocal = Snx.Quaternion.Normalize(
+                                    Snx.Quaternion.CreateFromAxisAngle(Snx.Vector3.Normalize(wristCurlLocal), 7f * (MathF.PI / 180f)));
+                                we.HasRelaxedWrist = true;
+                            }
+                        }
+                    }
                     string suffix = isLeft ? "L" : "R";
                     foreach (var (pmxBone, gameKey) in BoneContract.BoneMap)
                     {
@@ -646,6 +665,24 @@ namespace DollFrame
             de.FistCurlLocal = Snx.Quaternion.Normalize(
                 Snx.Quaternion.CreateFromAxisAngle(curlAxisLocal, deg * (MathF.PI / 180f)));
             de.HasFistCurl = true;
+
+            if (isThumb)
+            {
+                de.DigitSnapWeight = 0.30f;
+                de.DigitHangWeight = 0.35f;
+            }
+            else if (gameKey.StartsWith("digit2_", StringComparison.Ordinal))
+            {
+                de.DigitSnapWeight = 0.25f;
+                de.DigitHangWeight = 0.40f;
+            }
+            else
+            {
+                de.DigitSnapWeight = gameKey.Contains("_1", StringComparison.Ordinal) ? 0.35f
+                    : (gameKey.Contains("_2", StringComparison.Ordinal) ? 0.50f : 0.55f);
+                de.DigitHangWeight = gameKey.StartsWith("digit3_", StringComparison.Ordinal) ? 0.55f
+                    : (gameKey.StartsWith("digit4_", StringComparison.Ordinal) ? 0.68f : 0.80f);
+            }
         }
 
         private static int IndexOfName(PmxParser.PmxBone[] bones, string name)
@@ -770,7 +807,7 @@ namespace DollFrame
                     legSwing = Math.Clamp((fwdR - fwdL) * 0.70f, -0.55f, 0.55f);
                 }
             }
-            float breath = MathF.Sin(Time.time * 1.9f) * 0.015f;
+            float breath = MathF.Sin(Time.time * 1.6f) * 0.022f;
 
             for (int s = 0; s < 2; s++)
             {
@@ -779,8 +816,8 @@ namespace DollFrame
                 float liftUp = MathF.Abs(swing) * 0.14f;
                 var outward = s == 0 ? leftOutward : -leftOutward;
                 var hangDir = Snx.Vector3.Normalize(
-                    worldDown * (1f - liftUp) + outward * 0.15f + charFwd * (0.08f + swing));
-                float hangReach = (r.Chain.L1 + r.Chain.L2) * (0.94f - MathF.Abs(swing) * 0.05f);
+                    worldDown * (1f - liftUp) + outward * 0.08f + charFwd * (0.14f + swing));
+                float hangReach = (r.Chain.L1 + r.Chain.L2) * (0.86f - MathF.Abs(swing) * 0.04f);
                 _armHangTarget[s] = VecS(Bones[r.UpperIdx].position) + hangDir * hangReach;
                 _armHangPole[s] = Snx.Vector3.Normalize(-charFwd * 0.85f + outward * 0.45f + worldDown * 0.25f);
                 _armHangSwing[s] = swing;
@@ -827,15 +864,22 @@ namespace DollFrame
 
                     if (en.PureRel)
                     {
-                        // PureRel writes the local rotation straight in the rig-parent frame
-                        // (LocalFromWorld(parentWorld, parentWorld∘rel) == rel): the authored
-                        // rotation vs parent stays, and the game bone's rotation delta relative
-                        // to its own parent is composed through the attach convention difference.
-                        var qrel = Snx.Quaternion.Inverse(QuatS(en.GameParent.rotation)) * gameRot;
-                        var delta = Snx.Quaternion.Inverse(QuatS(en.GameRel0)) * qrel;
-                        pureRelLocal = Snx.Quaternion.Normalize(QuatS(en.AuthoredRel) * delta);
-                        pureRelWrite = true;
-                        target = Snx.Quaternion.Identity;   // unused; target-shaped for the shared tail
+                        if (en.GameParent != null)
+                        {
+                            // PureRel writes the local rotation straight in the rig-parent frame
+                            // (LocalFromWorld(parentWorld, parentWorld∘rel) == rel): the authored
+                            // rotation vs parent stays, and the game bone's rotation delta relative
+                            // to its own parent is composed through the attach convention difference.
+                            var qrel = Snx.Quaternion.Inverse(QuatS(en.GameParent.rotation)) * gameRot;
+                            var delta = Snx.Quaternion.Inverse(QuatS(en.GameRel0)) * qrel;
+                            pureRelLocal = Snx.Quaternion.Normalize(QuatS(en.AuthoredRel) * delta);
+                            pureRelWrite = true;
+                            target = Snx.Quaternion.Identity;   // unused; target-shaped for the shared tail
+                        }
+                        else
+                        {
+                            target = RigAim.CopyTarget(gameRot, QuatS(en.RestOffset));
+                        }
                     }
                     else if (en.PureDelta)
                     {
@@ -844,16 +888,19 @@ namespace DollFrame
                         // counters deliberately do not see this bone.
                         target = RigAim.CopyTarget(gameRot, QuatS(en.RestOffset));
                     }
-                    else if (ikDriven)
+                    else if (ikDriven || pureRelWrite)
                     {
-                        // 臂鏈 IK 面：target 已由上臂面的本幀兩骨 IK 求解提供（見上，Upper/Fore 各自落地）
+                        // 臂鏈 IK / 空手放鬆面：target 或 pureRelLocal 已由 TryEvaluateArmIkRole 填入
                     }
                     else
                     {
-                        var dGNow = en.Leaf ? VecS(en.GameBone.position - en.GameMate.position)
-                                            : VecS(en.GameMate.position - en.GameBone.position);
+                        bool hasMate = en.GameMate != null;
+                        var dGNow = hasMate
+                            ? (en.Leaf ? VecS(en.GameBone.position - en.GameMate.position)
+                                       : VecS(en.GameMate.position - en.GameBone.position))
+                            : Snx.Vector3.Zero;
                         var live = Snx.Quaternion.Identity;
-                        bool liveOk = !en.Leaf && en.GameHops > 1 &&
+                        bool liveOk = hasMate && !en.Leaf && en.GameHops > 1 &&
                             RigAim.TryLiveTarget(VecS(en.DirC), VecS(en.DirCPerp), VecS(en.GameSecLocal),
                                 QuatS(en.WorldRotAttach), gameRot, dGNow, out live);
                         target = liveOk ? live : RigAim.CopyTarget(gameRot, QuatS(en.RestOffset));
@@ -883,7 +930,13 @@ namespace DollFrame
                     else
                         bone.localRotation = QuatU(RigAim.LocalFromWorld(parentWorld, target));
 
-                    // 抓取精準度收斂（誤差 < 0.1cm）：持槍或持非槍械道具 IK 啟用時套用。
+                    if (Alive && (ArmIkActive || HoldingNonWeaponItem) && en.ArmIkRole == ArmIkRole.Digit && en.HasFistCurl && en.DigitSnapWeight > 0f)
+                    {
+                        var extraCurl = Snx.Quaternion.Slerp(Snx.Quaternion.Identity, en.FistCurlLocal, en.DigitSnapWeight);
+                        bone.localRotation = bone.localRotation * QuatU(extraCurl);
+                    }
+
+                    // 抓取精準度收斂（誤差 < 0.05cm）：持槍或持非槍械道具 IK 啟用時套用。
                     if (Alive && (ArmIkActive || HoldingNonWeaponItem) && en.ArmIkRole == ArmIkRole.Wrist)
                     {
                         var sideW = en.ArmIkSide;
@@ -894,7 +947,7 @@ namespace DollFrame
                             var desiredGrip = PalmGripPos(restW.Value.PalmBone, restW.Value.PalmMidBone);
                             var err = desiredGrip - actualGrip;
                             float errLen = err.Length();
-                            if (errLen > 0.0002f && errLen < 0.12f)
+                            if (errLen > 0.00005f && errLen < 0.35f)
                             {
                                 var errU = VecU(err);
                                 var uBone = Bones[restW.Value.UpperIdx];
@@ -919,8 +972,12 @@ namespace DollFrame
                         var rigAxis = en.Leaf ? VecS(en.RigBone.position - Bones[en.PmzMate].position)
                                               : VecS(Bones[en.PmzMate].position - en.RigBone.position);
                         var baked = RigAim.CopyTarget(gameRot, QuatS(en.RestOffset));
-                        var dot = Snx.Vector3.Dot(Snx.Vector3.Normalize(rigAxis), Snx.Vector3.Normalize(dGNowSample));
-                        float aDeg = MathF.Acos(Math.Clamp(dot, -1f, 1f)) * (180f / MathF.PI);
+                        float aDeg = 0f;
+                        if (rigAxis.LengthSquared() > 1e-10f && dGNowSample.LengthSquared() > 1e-10f)
+                        {
+                            var dot = Snx.Vector3.Dot(Snx.Vector3.Normalize(rigAxis), Snx.Vector3.Normalize(dGNowSample));
+                            aDeg = MathF.Acos(Math.Clamp(dot, -1f, 1f)) * (180f / MathF.PI);
+                        }
                         var qd = target * Snx.Quaternion.Inverse(baked);
                         if (qd.W < 0f) { qd.X = -qd.X; qd.Y = -qd.Y; qd.Z = -qd.Z; qd.W = -qd.W; }
                         float bDeg = 2f * MathF.Acos(Math.Clamp(qd.W, -1f, 1f)) * (180f / MathF.PI);
@@ -1015,7 +1072,7 @@ namespace DollFrame
                 case ArmIkRole.Wrist:
                     if (runHangIk)
                     {
-                        pureRelLocal = Snx.Quaternion.Identity;
+                        pureRelLocal = en.HasRelaxedWrist ? en.RelaxedWristLocal : Snx.Quaternion.Identity;
                         pureRelWrite = true;
                         target = Snx.Quaternion.Identity;
                         return false;
@@ -1029,7 +1086,8 @@ namespace DollFrame
                 case ArmIkRole.Digit:
                     if (runHangIk && en.HasFistCurl)
                     {
-                        pureRelLocal = en.FistCurlLocal;
+                        float w = en.DigitHangWeight > 0f ? en.DigitHangWeight : 0.55f;
+                        pureRelLocal = Snx.Quaternion.Slerp(Snx.Quaternion.Identity, en.FistCurlLocal, w);
                         pureRelWrite = true;
                         target = Snx.Quaternion.Identity;
                     }

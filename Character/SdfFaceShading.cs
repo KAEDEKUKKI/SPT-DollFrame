@@ -266,15 +266,17 @@ namespace DollFrame
                 if (textureBytes.TryGetValue(SdfFaceAsset.ContainerKey, out var sdfBytes))
                 {
                     var temp = new Texture2D(2, 2, TextureFormat.RGBA32, false, false);
-                    if (!temp.LoadImage(sdfBytes, false))
+                    try
+                    {
+                        if (!temp.LoadImage(sdfBytes, false)) return null;
+                        px = temp.GetPixels32();
+                        w = temp.width;
+                        h = temp.height;
+                    }
+                    finally
                     {
                         UnityEngine.Object.Destroy(temp);
-                        return null;
                     }
-                    px = temp.GetPixels32();
-                    w = temp.width;
-                    h = temp.height;
-                    UnityEngine.Object.Destroy(temp);
                 }
                 else
                 {
@@ -432,19 +434,23 @@ namespace DollFrame
 
             if (!string.IsNullOrEmpty(cacheDir) && Directory.Exists(cacheDir))
             {
+                Texture2D tex = null;
                 try
                 {
                     var savePath = Path.Combine(cacheDir, SdfFaceAsset.ContainerKey);
-                    var tex = new Texture2D(size, size, TextureFormat.RGBA32, false, false);
+                    tex = new Texture2D(size, size, TextureFormat.RGBA32, false, false);
                     tex.SetPixels32(outPx);
                     tex.Apply(false, false);
                     File.WriteAllBytes(savePath, tex.EncodeToPNG());
-                    UnityEngine.Object.Destroy(tex);
                     Plugin.Log.LogInfo($"[DollFrame] sdf_face: auto-baked {size}x{size} -> '{savePath}'");
                 }
                 catch (Exception ex)
                 {
                     Plugin.Log.LogWarning($"[DollFrame] sdf_face cache write failed: {ex.Message}");
+                }
+                finally
+                {
+                    if (tex != null) UnityEngine.Object.Destroy(tex);
                 }
             }
             return outPx;
@@ -534,17 +540,22 @@ namespace DollFrame
                 int nh = Mathf.Max(1, Mathf.RoundToInt(h * k));
                 var rt = RenderTexture.GetTemporary(nw, nh, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
                 var prev = RenderTexture.active;
+                Texture2D dst = null;
                 try
                 {
                     Graphics.Blit(t, rt);
-                    var dst = new Texture2D(nw, nh, TextureFormat.RGBA32, false, false);
+                    dst = new Texture2D(nw, nh, TextureFormat.RGBA32, false, false);
                     RenderTexture.active = rt;
                     dst.ReadPixels(new Rect(0, 0, nw, nh), 0, 0);
                     dst.Apply(false, false);
-                    return (dst, dst.GetPixels32());
+                    var px = dst.GetPixels32();
+                    var res = (dst, px);
+                    dst = null;
+                    return res;
                 }
                 finally
                 {
+                    if (dst != null) UnityEngine.Object.Destroy(dst);
                     RenderTexture.active = prev;
                     RenderTexture.ReleaseTemporary(rt);
                     UnityEngine.Object.Destroy(t);

@@ -113,6 +113,7 @@ namespace DollFrame
             var voiceDir = ResolveVoiceDir(pkgName);
             if (voiceDir == null)
             {
+                Restore(player);
                 if (!string.IsNullOrEmpty(pkgName) && _lastMissingWarnFamily != pkgName)
                 {
                     _lastMissingWarnFamily = pkgName;
@@ -122,10 +123,18 @@ namespace DollFrame
             }
 
             var family = Path.GetFileNameWithoutExtension(voiceDir);
+            // 先還原並卸載當前說話者，避免 ClearCache 銷毀舊 AudioClip 後新包缺 bank 造成 Use-After-Free
+            if (!string.Equals(_cachedFamily, family, StringComparison.Ordinal))
+                Restore(player);
             var bankMap = GetOrLoadFamilyClips(family, voiceDir);
-            if (bankMap == null || bankMap.Count == 0) return;
+            if (bankMap == null || bankMap.Count == 0)
+            {
+                Restore(player);
+                return;
+            }
 
             SnapshotOriginals(speaker);
+            _activeSpeakers.Add(speaker);
 
             int replacedBanks = 0;
             int replacedClips = 0;
@@ -177,10 +186,13 @@ namespace DollFrame
             return null;
         }
 
+        private static readonly HashSet<BaseSpeaker> _activeSpeakers = new HashSet<BaseSpeaker>();
+
         internal static void Restore(Player player)
         {
             if (player == null || player.Speaker == null) return;
             var speaker = player.Speaker;
+            _activeSpeakers.Remove(speaker);
             if (!OriginalSnapshots.TryGetValue(speaker, out var snap) || snap == null) return;
 
             int restored = 0;
@@ -201,6 +213,9 @@ namespace DollFrame
             }
             if (restored > 0)
                 Plugin.Log.LogInfo($"[DollFrame] voice: restored vanilla ({restored} banks)");
+            _activeSpeakers.RemoveWhere(s => s == null);
+            if (_activeSpeakers.Count == 0)
+                ClearCache();
         }
 
         private static void SnapshotOriginals(BaseSpeaker speaker)
@@ -303,8 +318,15 @@ namespace DollFrame
                 var list = new List<AudioClip>(files.Length);
                 foreach (var f in files)
                 {
-                    var clip = LoadWavBytes(File.ReadAllBytes(f), $"DollFrame_{family}_{bankName}_{Path.GetFileNameWithoutExtension(f)}");
-                    if (clip != null) list.Add(clip);
+                    try
+                    {
+                        var clip = LoadWavBytes(File.ReadAllBytes(f), $"DollFrame_{family}_{bankName}_{Path.GetFileNameWithoutExtension(f)}");
+                        if (clip != null) list.Add(clip);
+                    }
+                    catch (Exception e)
+                    {
+                        Plugin.Log.LogWarning($"[DollFrame] voice wav read failed '{f}': {e.Message}");
+                    }
                 }
                 if (list.Count > 0) map[bankName] = list.ToArray();
             }
@@ -330,6 +352,7 @@ namespace DollFrame
 
         private static AudioClip LoadWavBytes(byte[] bytes, string clipName)
         {
+            AudioClip clip = null;
             try
             {
                 if (bytes == null || bytes.Length < 44) return null;
@@ -374,15 +397,16 @@ namespace DollFrame
                 int frames = totalSamples / channels;
                 if (frames <= 0) return null;
 
-                var samples = new float[totalSamples];
+                int sampleCount = frames * channels;
+                var samples = new float[sampleCount];
                 if (audioFormat == 1 && bitsPerSample == 16)
                 {
-                    for (int i = 0; i < totalSamples; i++)
+                    for (int i = 0; i < sampleCount; i++)
                         samples[i] = BitConverter.ToInt16(bytes, dataOffset + i * 2) / 32768f;
                 }
                 else if (audioFormat == 3 && bitsPerSample == 32)
                 {
-                    for (int i = 0; i < totalSamples; i++)
+                    for (int i = 0; i < sampleCount; i++)
                         samples[i] = BitConverter.ToSingle(bytes, dataOffset + i * 4);
                 }
                 else
@@ -390,15 +414,53 @@ namespace DollFrame
                     return null;
                 }
 
-                var clip = AudioClip.Create(clipName, frames, channels, sampleRate, false);
+                NormalizeAndBoostVoice(samples);
+
+                clip = AudioClip.Create(clipName, frames, channels, sampleRate, false);
                 clip.SetData(samples, 0);
                 clip.hideFlags = HideFlags.DontUnloadUnusedAsset;
                 return clip;
             }
             catch (Exception e)
             {
+                if (clip != null) UnityEngine.Object.Destroy(clip);
                 Plugin.Log.LogWarning($"[DollFrame] voice wav load failed '{clipName}': {e.Message}");
                 return null;
+            }
+        }
+
+        private static void NormalizeAndBoostVoice(float[] samples)
+        {
+            if (samples == null || samples.Length == 0) return;
+            double sumSq = 0.0;
+            float peak = 0f;
+            for (int i = 0; i < samples.Length; i++)
+            {
+                float s = samples[i];
+                float a = s < 0f ? -s : s;
+                if (a > peak) peak = a;
+                sumSq += (double)s * s;
+            }
+            if (peak < 0.005f) return;
+
+            float rms = (float)Math.Sqrt(sumSq / samples.Length);
+            float gain = rms > 1e-4f ? 0.24f / rms : (0.95f / peak);
+            if (gain > 6.0f) gain = 6.0f;
+            if (gain < 1.0f && peak <= 0.98f) gain = Math.Min(1.0f, 0.95f / peak);
+
+            const float knee = 0.80f;
+            const float headroom = 0.18f;
+            for (int i = 0; i < samples.Length; i++)
+            {
+                float x = samples[i] * gain;
+                float ax = x < 0f ? -x : x;
+                if (ax > knee)
+                {
+                    float over = (ax - knee) / headroom;
+                    float shaped = knee + headroom * (float)Math.Tanh(over);
+                    x = x < 0f ? -shaped : shaped;
+                }
+                samples[i] = x;
             }
         }
     }

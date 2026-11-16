@@ -4,7 +4,7 @@
     <AssemblyName>DollFrame</AssemblyName>
     <RootNamespace>DollFrame</RootNamespace>
     <TargetFramework>netstandard2.1</TargetFramework>
-    <Version>0.4.0</Version>
+    <Version>0.4.1</Version>
     <Description>Modular PMX character model, IK retargeting, PBR/SDF shader, and voice replacement framework for SPTarkov.</Description>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>

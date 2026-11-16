@@ -49,6 +49,22 @@ namespace DollFrame
         private static readonly Dictionary<string, CardSprite> _cache =
             new Dictionary<string, CardSprite>(StringComparer.Ordinal);
 
+        private static string BuildCacheKey(string pkgPath)
+        {
+            int mask = 0;
+            if (Plugin.HideArmor?.Value == true) mask |= 1 << 0;
+            if (Plugin.HideTacticalRig?.Value == true) mask |= 1 << 1;
+            if (Plugin.HideBackpack?.Value == true) mask |= 1 << 2;
+            if (Plugin.HideHeadwear?.Value == true) mask |= 1 << 3;
+            if (Plugin.HideFaceCover?.Value == true) mask |= 1 << 4;
+            if (Plugin.HideEyewear?.Value == true) mask |= 1 << 5;
+            if (Plugin.HideEarpiece?.Value == true) mask |= 1 << 6;
+            if (Plugin.HideArmBand?.Value == true) mask |= 1 << 7;
+            if (Plugin.HideModelAccessories?.Value == true) mask |= 1 << 8;
+            int maxTex = Plugin.MaxTextureSize?.Value ?? 0;
+            return $"{pkgPath}|m{mask}|t{maxTex}";
+        }
+
         private static IEnumerable<MethodBase> TargetMethods()
         {
             var t = AccessTools.TypeByName("PlayerIcons.PlayerIconImage") ?? AccessTools.TypeByName("PlayerIconImage");
@@ -94,7 +110,8 @@ namespace DollFrame
             }
 
             if (__instance._progress != null) __instance._progress.SetActive(false);
-            if (_cache.TryGetValue(pkgPath, out var cached))
+            var cacheKey = BuildCacheKey(pkgPath);
+            if (_cache.TryGetValue(cacheKey, out var cached))
             {
                 if (cached != null && cached.Sprite != null && cached.Texture != null)
                 {
@@ -102,7 +119,7 @@ namespace DollFrame
                     __instance._pmcPreview.enabled = true;
                     return false;
                 }
-                _cache.Remove(pkgPath);
+                _cache.Remove(cacheKey);
             }
 
             __instance._pmcPreview.enabled = false;          // 渲染完成前保持空白，避免 PMC 閃現
@@ -115,6 +132,7 @@ namespace DollFrame
             PlayerModelLoader loader = null;
             GameObject host = null;
             string pkgName = null;
+            PlayerIconCreatorSettings fallbackSettings = null;
             try
             {
                 var sw = Stopwatch.StartNew();
@@ -139,15 +157,19 @@ namespace DollFrame
                 if (games == null) throw new InvalidOperationException("skeleton anchors incomplete");
 
                 var assets = PmxAssets.LoadOrAcquire(pkgPath, Plugin.MaxTextureSize.Value,
-                    Plugin.FlipUv.Value, AccessoryFilter.FromConfig(),
+                    true, AccessoryFilter.FromConfig(),
                     out pkgName, out var warm, out _);
                 if (assets == null) throw new InvalidOperationException($"package '{pkgName}' failed to load");
 
                 var contract = GameBones.ContractCheck(games);
 
                 // BSG 自家 icon 構圖（Resources 資產；取不到則用其欄位預設值，等 同構圖）
-                var settings = Resources.Load<PlayerIconCreatorSettings>("PlayerIconCreatorSettings")
-                    ?? ScriptableObject.CreateInstance<PlayerIconCreatorSettings>();
+                var settings = Resources.Load<PlayerIconCreatorSettings>("PlayerIconCreatorSettings");
+                if (settings == null)
+                {
+                    fallbackSettings = ScriptableObject.CreateInstance<PlayerIconCreatorSettings>();
+                    settings = fallbackSettings;
+                }
                 ApplyIconPose(modelGo, settings);
 
                 // 構圖走 BSG 自家 PlayerIconCreatorSettings（模型側等比縮放後骨架 pristine，無 post-fit 高差補償）。
@@ -158,7 +180,8 @@ namespace DollFrame
                 // 2 幀穩定後 Drive＋捕捉；本續行到此為止，不再持有清理責任。
                 var driver = host.AddComponent<CardIconDriver>();
                 driver.Bind(rootJoint, games, rig, host, loader, modelGo, settings,
-                    pkgPath, pkgName, preview, sw, warm, contract);
+                    pkgPath, pkgName, preview, sw, warm, contract, fallbackSettings);
+                fallbackSettings = null;
             }
             catch (Exception e)
             {
@@ -167,11 +190,12 @@ namespace DollFrame
                     _warned = true;
                     Plugin.Log.LogWarning($"[DollFrame] card icon: render failed ({e.GetType().Name}) - card stays blank this session");
                 }
-                if (_cache.TryGetValue(pkgPath, out var cached))
+                if (preview != null && _cache.TryGetValue(pkgPath, out var cached))
                 {
                     preview.sprite = cached.Sprite;
                     preview.enabled = true;
                 }
+                if (fallbackSettings != null) UnityEngine.Object.Destroy(fallbackSettings);
                 if (loader != null) SafeClear(loader, pkgName);
                 if (host != null) UnityEngine.Object.Destroy(host);
             }
@@ -219,11 +243,13 @@ namespace DollFrame
             private bool _warm;
             private (int resolved, int total, int digits, List<string> missing) _contract;
             private int _spawnFrame;
+            private PlayerIconCreatorSettings _fallbackSettings;
 
             internal void Bind(Transform rootJoint, Dictionary<string, Transform> games, CharacterRig rig,
                 GameObject host, PlayerModelLoader loader, GameObject modelGo, PlayerIconCreatorSettings settings,
                 string pkgPath, string pkgName, Image preview, Stopwatch sw, bool warm,
-                (int resolved, int total, int digits, List<string> missing) contract)
+                (int resolved, int total, int digits, List<string> missing) contract,
+                PlayerIconCreatorSettings fallbackSettings)
             {
                 _rootJoint = rootJoint;
                 _games = games;
@@ -239,6 +265,7 @@ namespace DollFrame
                 _warm = warm;
                 _contract = contract;
                 _spawnFrame = Time.frameCount;
+                _fallbackSettings = fallbackSettings;
             }
 
             private void LateUpdate()
@@ -258,7 +285,8 @@ namespace DollFrame
                         TradingCardIcon._warned = true;
                         Plugin.Log.LogWarning($"[DollFrame] card icon: capture failed ({e.GetType().Name}) - card stays blank this session");
                     }
-                    if (_preview != null && TradingCardIcon._cache.TryGetValue(_pkgPath, out var cached))
+                    var cacheKey = TradingCardIcon.BuildCacheKey(_pkgPath);
+                    if (_preview != null && TradingCardIcon._cache.TryGetValue(cacheKey, out var cached))
                     {
                         _preview.sprite = cached.Sprite;
                         _preview.enabled = true;
@@ -285,27 +313,18 @@ namespace DollFrame
 
                 _rig.Drive();                                 // 與捕捉同一同步區塊，姿勢一致
                 var tex = Capture(_rootJoint, _games, _rig, _host, _settings);
-                try
-                {
-                    var png = UnityEngine.ImageConversion.EncodeToPNG(tex);
-                    if (png != null)
-                    {
-                        var path = Path.Combine(Path.GetDirectoryName(typeof(Plugin).Assembly.Location) ?? ".", "card_icon_debug.png");
-                        File.WriteAllBytes(path, png);
-                    }
-                }
-                catch (Exception e) { WarnTeardown(e); }
                 tex.hideFlags = HideFlags.DontUnloadUnusedAsset;
                 var sprite = Sprite.Create(tex, new Rect(0f, 0f, tex.width, tex.height),
                     new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect, Vector4.zero);
                 sprite.hideFlags = HideFlags.DontUnloadUnusedAsset;
 
-                if (TradingCardIcon._cache.TryGetValue(_pkgPath, out var old))
+                var cacheKey = TradingCardIcon.BuildCacheKey(_pkgPath);
+                if (TradingCardIcon._cache.TryGetValue(cacheKey, out var old))
                 {
                     if (old.Sprite != null) UnityEngine.Object.Destroy(old.Sprite);
                     if (old.Texture != null) UnityEngine.Object.Destroy(old.Texture);
                 }
-                TradingCardIcon._cache[_pkgPath] = new TradingCardIcon.CardSprite { Sprite = sprite, Texture = tex };
+                TradingCardIcon._cache[cacheKey] = new TradingCardIcon.CardSprite { Sprite = sprite, Texture = tex };
 
                 if (_preview != null)
                 {
@@ -319,12 +338,19 @@ namespace DollFrame
 
             private void Finish()
             {
-                // 收尾順序＝與 async 版相同：mesh＋PmxAssets refcount → loader.Clear（連帶
+                // 收尾順序＝與 async 版相同：mesh＋SDF＋PmxAssets refcount → loader.Clear（連帶
                 // 拆 rig GO 與 fit）→ host 連相機整棵銷毀。可重入。
+                if (_rig != null)
+                {
+                    if (_rig.Mesh != null) UnityEngine.Object.DestroyImmediate(_rig.Mesh);
+                    if (_rig.HeadMesh != null) UnityEngine.Object.DestroyImmediate(_rig.HeadMesh);
+                    _rig.TerminateSdf();
+                }
+                if (_fallbackSettings != null) UnityEngine.Object.Destroy(_fallbackSettings);
                 if (_loader != null) TradingCardIcon.SafeClear(_loader, _pkgName);
                 if (_host != null) UnityEngine.Object.Destroy(_host);
                 _rootJoint = null; _games = null; _rig = null; _host = null;
-                _loader = null; _modelGo = null; _preview = null;
+                _loader = null; _modelGo = null; _preview = null; _fallbackSettings = null;
                 Destroy(this);
             }
         }
@@ -395,12 +421,12 @@ namespace DollFrame
                     var tex = new Texture2D(w, h, TextureFormat.RGBA32, false, false);
                     tex.ReadPixels(new Rect(0f, 0f, w, h), 0, 0);
                     tex.Apply(false, false);
-                    RenderTexture.active = null;
-                    cam.targetTexture = null;
                     return tex;
                 }
                 finally
                 {
+                    RenderTexture.active = null;
+                    cam.targetTexture = null;
                     RenderTexture.ReleaseTemporary(rt);
                 }
             }
@@ -433,23 +459,14 @@ namespace DollFrame
         private static void HideCardSurfaces(GameObject bodyGo, EFT.PlayerBody body)
         {
             var keep = new HashSet<Renderer>();
-            var views = body != null ? body.SlotViews : null;
             foreach (var slot in DollFrame.Visibility.EquipmentSlotHider.VisualSlots)
             {
                 if (DollFrame.Visibility.EquipmentSlotHider.ShouldHide(slot)) continue;      // 已被快照清空，不會生成 view
-                GameObject model = null;
                 try
                 {
-                    if (views != null && views.ContainsKey(slot))
-                    {
-                        var view = views.GetByKey(slot);
-                        if (view?.ParentedModel != null) model = view.ParentedModel.Value;
-                    }
+                    DollFrame.Visibility.EquipmentSlotHider.CollectSlotRenderers(body, slot, keep);
                 }
                 catch (Exception e) { WarnTeardown(e); }
-                if (model == null) continue;
-                foreach (var r in model.GetComponentsInChildren<Renderer>(true))
-                    if (r != null) keep.Add(r);
             }
             foreach (var r in bodyGo.GetComponentsInChildren<Renderer>(true))
             {

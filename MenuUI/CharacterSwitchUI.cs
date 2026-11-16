@@ -44,9 +44,10 @@ namespace DollFrame
             try
             {
                 var screen = __instance as Component;
-                if (screen == null || !Plugin.ReplaceBody.Value) return;
-                if (__originalMethod.Name == "Show") SwitchMenuDriver.Ensure(screen.gameObject);
-                else SwitchMenuDriver.Close(screen.gameObject);
+                if (screen == null) return;
+                if (__originalMethod.Name != "Show") { SwitchMenuDriver.Close(screen.gameObject); return; }
+                if (!Plugin.ReplaceBody.Value) return;
+                SwitchMenuDriver.Ensure(screen.gameObject);
             }
             catch (Exception e)
             {
@@ -105,6 +106,12 @@ namespace DollFrame
         {
             if (_rowB != null) Destroy(_rowB);
             _rowB = null; _rowBLabel = null; _targetRT = null;
+        }
+
+        private void OnDestroy()
+        {
+            Teardown();
+            if (_white != null) { Destroy(_white); _white = null; }
         }
 
         private void Build(string[] names, string current)
@@ -183,7 +190,9 @@ namespace DollFrame
                     rt.anchoredPosition = new Vector2(posX, -45f);
                 }
             }
-            _rowB.transform.SetAsLastSibling();
+            var parent = _rowB.transform.parent;
+            if (parent != null && _rowB.transform.GetSiblingIndex() != parent.childCount - 1)
+                _rowB.transform.SetAsLastSibling();
         }
 
         private RectTransform ResolveTargetRectTransform()

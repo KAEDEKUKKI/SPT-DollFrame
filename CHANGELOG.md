@@ -1,5 +1,21 @@
 # DollFrame 變更紀錄（Changelog）
 
+## 0.4.1（2026-11-16：全模組優化、裝備/武器隱藏修復、IK/語音優化與三語系文件）
+
+* **全模組生命週期、記憶體洩漏與邊界防護**：
+  * `Plugin.cs` 新增 `IdleCacheSize` / `ReplaceBody` 即時變動同步；`CapsulePatches` 新增已銷毀鍵清理（`PruneDestroyed`）與停用守衛；`IkRefresh` 補上 null 與啟用檢查；`BodyReplacer` 強化 `Reapply` 失敗還原與資源釋放；`VoiceReplacer` 修正切換家族時的 `AudioClip` Use-After-Free 與 WAV 緩衝安全；`PmxRuntime` / `SdfFaceShading` 強化 PMX 負數/截斷防護與 `finally` 暫存貼圖回收；`MenuUI` 優化 `CharacterSwitchUI` 版面重算、`PreviewProxy` VisualShield 隔離及 `TradingCardIcon` 快取鍵與資源釋放。
+* **裝備與武器隱藏修復**：
+  * `EquipmentSlotHider.CollectSlotRenderers` 擴大收集 `SlotView.Model`、`Renderers`、`MainDress` 與 `Dresses`（修復頭盔、耳機、面罩未隱藏問題）。
+  * `BodyReplacer.LateUpdate` 偵測手中物品切換當幀即時呼叫 `Sync`，並於 `CollectSlotRenderers` 跳過 `Weapon_root*` 下方模型，修復切換武器時短暫隱藏問題。
+* **IK 與空手姿態優化**：
+  * 腕部握點收斂放寬至 `errLen < 0.35f`、下限 `0.00005f`（`< 0.05 cm` 精度），並為持槍手指加入漸進式吸附收攏（改善指尖微翹）。
+  * 空手垂臂伸展比調整為 `0.86f`、增加 `7°` 腕部自然內屈與五指漸進微彎，改善生硬感。
+* **語音音量優化**：
+  * `VoiceReplacer.LoadWavBytes` 加入 RMS 響度標準化（目標 RMS `0.24`、上限 `6x`）與軟削波限幅（`0.80` knee / `0.98` 上限），解決語音偏小聲問題。
+* **設定精簡與三語系 README**：
+  * 移除 `Switch character key`、`Flip UV`、`Scale model to game proportions`、`Hide head in first person`、`IK arm retarget to game hands` 設定項並固定為預設行為；重寫英文／繁體中文／日文三語系 README。
+* **版本**：client `0.4.0` → `0.4.1`；`ServerMod` 同步 `0.4.1`。
+
 ## 0.4.0（2026-11-16：藏身處穿模掉進虛空修復）
 
 * **藏身處穿地板掉進虛空修復**：

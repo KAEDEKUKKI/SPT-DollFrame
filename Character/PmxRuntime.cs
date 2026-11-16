@@ -94,15 +94,18 @@ namespace DollFrame
 
         internal static PmxModel Parse(byte[] pmxBytes)
         {
+            if (pmxBytes == null || pmxBytes.Length < 17)
+                throw new InvalidDataException("PMX data truncated or null");
             // one bulk read: the vertex loop does ~20 tiny reads per vertex, which is
             // slow against an unbuffered FileStream (this runs on the main thread at raid load)
             using var f = new BinaryReader(new MemoryStream(pmxBytes, false));
             var magic = f.ReadBytes(4);
-            if (magic[0] != 'P' || magic[1] != 'M' || magic[2] != 'X' || magic[3] != ' ')
+            if (magic.Length < 4 || magic[0] != 'P' || magic[1] != 'M' || magic[2] != 'X' || magic[3] != ' ')
                 throw new InvalidDataException("not a PMX file");
             float ver = f.ReadSingle();
             int gcount = f.ReadSByte();
             var g = f.ReadBytes(8);
+            if (g.Length < 8) throw new InvalidDataException("PMX header truncated");
             var parser = new PmxParser(f, g[0], g[1], g[2], g[3], g[5]); // g[4]/g[6]/g[7] (mat/morph/rig idx) are read but unused
             if (ver < 2.0f || ver >= 2.1f)
                 throw new InvalidDataException($"unsupported PMX version {ver:0.##} (this importer handles 2.0 only)");
@@ -118,6 +121,7 @@ namespace DollFrame
 
             // ---- vertices ----
             int nv = _f.ReadInt32();
+            if (nv < 0) throw new InvalidDataException($"invalid PMX vertex count {nv}");
             m.Pos = new Vector3[nv];
             m.Normals = new Vector3[nv];
             m.Uv = new Vector2[nv];
@@ -144,16 +148,19 @@ namespace DollFrame
             // ---- faces: convert to per-material triangle lists later ----
             // vertex indices may exceed 32767 (60352 verts); read unsigned
             int nfaceIndices = _f.ReadInt32();
+            if (nfaceIndices < 0) throw new InvalidDataException($"invalid PMX face index count {nfaceIndices}");
             var allIndices = new int[nfaceIndices];
             for (int i = 0; i < nfaceIndices; i++)
                 allIndices[i] = ReadIdx(_vtxIdx, false);
             // ---- textures ----
             int nt = _f.ReadInt32();
+            if (nt < 0) throw new InvalidDataException($"invalid PMX texture count {nt}");
             m.TexPaths = new string[nt];
             for (int i = 0; i < nt; i++)
                 m.TexPaths[i] = ReadStr().Replace('\\', '/');
             // ---- materials ----
             int nm = _f.ReadInt32();
+            if (nm < 0) throw new InvalidDataException($"invalid PMX material count {nm}");
             m.Mats = new PmxMat[nm];
             m.MaterialTris = new int[nm][];
             int faceCursor = 0;
@@ -181,6 +188,7 @@ namespace DollFrame
                 mat.ToonIdx = mat.SharedToon ? _f.ReadByte() : ReadIdx(_texIdx, false);
                 mat.Memo = ReadStr();
                 mat.FaceCount = _f.ReadInt32();
+                if (mat.FaceCount < 0) throw new InvalidDataException($"invalid PMX material face count {mat.FaceCount}");
                 m.Mats[i] = mat;
 
                 var tris = new int[mat.FaceCount];
@@ -321,7 +329,10 @@ namespace DollFrame
         private string ReadStr()
         {
             int len = _f.ReadInt32();
+            if (len < 0) throw new InvalidDataException($"invalid PMX string length {len}");
+            if (len == 0) return string.Empty;
             var raw = _f.ReadBytes(len);
+            if (raw.Length < len) throw new EndOfStreamException("PMX string truncated");
             return (_enc == 0 ? Encoding.Unicode : Encoding.UTF8).GetString(raw);
         }
 
@@ -832,6 +843,9 @@ namespace DollFrame
             if (opaqueShader == null)
                 Plugin.Log.LogError("[DollFrame] Character shader not found; materials will be unlit pink");
             var materials = new List<Material>();
+            int doubleSided = 0;
+            try
+            {
             int faceMatIdx = -1;
             for (int i = 0; i < pmx.Mats.Length; i++)
                 if (string.Equals(pmx.Mats[i].Name, "Face", StringComparison.OrdinalIgnoreCase)) { faceMatIdx = i; break; }
@@ -881,7 +895,6 @@ namespace DollFrame
 
             // Split mesh into Body and Head by bone weights for first-person hiding + 100% full-body ground shadows
             var (bodyMesh, headMesh) = MeshSplitter.SplitMeshByBones(pmx, null);
-            int doubleSided = 0;
             if (headMesh != null && headMesh.TriangleCount > 0)
             {
                 a.Mesh = BuildUnityMesh("DollFrame_" + pmx.Name + "_Body", bodyMesh, pmx, a.KeptMaterialIdx, flipUv, ref doubleSided, out a.SkinBones);
@@ -907,6 +920,15 @@ namespace DollFrame
 
             Cache[cacheKey] = a;
             Acquire(cacheKey);
+            }
+            catch
+            {
+                foreach (var tex in textures.Values) if (tex != null) UnityEngine.Object.Destroy(tex);
+                foreach (var mat in materials) if (mat != null) UnityEngine.Object.Destroy(mat);
+                if (a.Mesh != null) UnityEngine.Object.Destroy(a.Mesh);
+                if (a.HeadMesh != null) UnityEngine.Object.Destroy(a.HeadMesh);
+                throw;
+            }
             int triTotal = 0;
             foreach (var tr in pmx.MaterialTris) triTotal += tr.Length;
             Plugin.Log.LogInfo($"[DollFrame] pmx loaded: '{pmx.Name}' ({cacheKey}) verts={pmx.Pos.Length} tris={triTotal / 3} " +
@@ -1046,14 +1068,13 @@ namespace DollFrame
                 RenderTexture.active = rt;
                 dst.ReadPixels(new Rect(0, 0, w, h), 0, 0);
                 dst.Apply(false, true);
-                RenderTexture.active = prev;
-                UnityEngine.Object.Destroy(src);
                 return dst;
             }
             finally
             {
                 RenderTexture.active = prev;
                 RenderTexture.ReleaseTemporary(rt);
+                if (src != null) UnityEngine.Object.Destroy(src);
             }
         }
     }

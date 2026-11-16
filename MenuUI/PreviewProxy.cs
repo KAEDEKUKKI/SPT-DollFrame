@@ -137,6 +137,10 @@ namespace DollFrame
         private Camera _shieldedCamera;
         private int _origCullingMask;
 
+        private readonly List<Renderer> _shieldHidden = new List<Renderer>();
+        private static readonly List<WeaponPrefab> _weaponBuf = new List<WeaponPrefab>(4);
+        private static readonly List<Renderer> _weaponRenderBuf = new List<Renderer>(16);
+
         internal void ArmVisualShield()
         {
             if (VanillaSelection.IsVanilla(Plugin.Character?.Value)) return;
@@ -162,6 +166,16 @@ namespace DollFrame
                     _shieldedCamera.cullingMask = _origCullingMask;
                     _shieldedCamera = null;
                 }
+                for (int i = 0; i < _shieldHidden.Count; i++)
+                {
+                    var r = _shieldHidden[i];
+                    if (r != null && !_hidden.Contains(r))
+                    {
+                        r.enabled = true;
+                        r.shadowCastingMode = ShadowCastingMode.On;
+                    }
+                }
+                _shieldHidden.Clear();
             }
         }
 
@@ -184,19 +198,26 @@ namespace DollFrame
         internal void HideAllRenderers()
         {
             if (_view == null) return;
+            _shieldHidden.Clear();
             foreach (var smr in _view.GetComponentsInChildren<SkinnedMeshRenderer>(true))
             {
                 if (smr == null || (smr.name != null && smr.name.StartsWith("DollFrame_"))) continue;
-                _hidden.Add(smr);
-                if (smr.enabled) smr.enabled = false;
-                smr.shadowCastingMode = ShadowCastingMode.Off;
+                if (smr.enabled)
+                {
+                    _shieldHidden.Add(smr);
+                    smr.enabled = false;
+                    smr.shadowCastingMode = ShadowCastingMode.Off;
+                }
             }
             foreach (var mr in _view.GetComponentsInChildren<MeshRenderer>(true))
             {
                 if (mr == null || (mr.name != null && mr.name.StartsWith("DollFrame_"))) continue;
-                _hidden.Add(mr);
-                if (mr.enabled) mr.enabled = false;
-                mr.shadowCastingMode = ShadowCastingMode.Off;
+                if (mr.enabled)
+                {
+                    _shieldHidden.Add(mr);
+                    mr.enabled = false;
+                    mr.shadowCastingMode = ShadowCastingMode.Off;
+                }
             }
         }
 
@@ -234,7 +255,12 @@ namespace DollFrame
                 DisarmVisualShield();
 
             if (_view == null) { Teardown("view gone"); Destroy(gameObject); return; }
-            if (!Plugin.ReplaceBody.Value) return;
+            if (!Plugin.ReplaceBody.Value)
+            {
+                if (_skin != null || _rig != null || _hidden.Count > 0)
+                    Teardown("ReplaceBody disabled");
+                return;
+            }
 
             // 切換角色（Visual/Character 設定變動）→ 拆掉重掛
             if (VanillaSelection.IsVanilla(Plugin.Character?.Value))
@@ -337,11 +363,19 @@ namespace DollFrame
         private static bool HasActiveShowcaseWeapon(Transform skel)
         {
             if (skel == null) return false;
-            foreach (var wp in skel.GetComponentsInChildren<WeaponPrefab>(true))
+            _weaponBuf.Clear();
+            skel.GetComponentsInChildren(true, _weaponBuf);
+            for (int i = 0; i < _weaponBuf.Count; i++)
             {
+                var wp = _weaponBuf[i];
                 if (wp == null || !wp.gameObject.activeInHierarchy) continue;
-                foreach (var r in wp.GetComponentsInChildren<Renderer>(true))
+                _weaponRenderBuf.Clear();
+                wp.GetComponentsInChildren(true, _weaponRenderBuf);
+                for (int j = 0; j < _weaponRenderBuf.Count; j++)
+                {
+                    var r = _weaponRenderBuf[j];
                     if (r != null && r.enabled && r.gameObject.activeInHierarchy) return true;
+                }
             }
             return false;
         }
@@ -385,7 +419,7 @@ namespace DollFrame
             var menuDump = GameBones.GameRigDump(skel);
 
             var assets = PmxAssets.LoadOrAcquire(pkgPath, Plugin.MaxTextureSize.Value,
-                Plugin.FlipUv.Value, AccessoryFilter.FromConfig(),
+                true, AccessoryFilter.FromConfig(),
                 out var pkgName, out var warm, out var preloadMs);
             if (assets == null)
             {
@@ -398,7 +432,7 @@ namespace DollFrame
 
             // independent rig on the preview skeleton (menu keeps no ground offset, as before)
             var menuMetrics = ModelMetrics.Compute(assets.Model, Plugin.PmxUnitScale.Value, menuDump);
-            var previewScale = Plugin.ProportionScale.Value ? ModelScaleMath.Solve(menuMetrics.Factors) : (ModelScaleMath.ScalePlan?)null;
+            var previewScale = ModelScaleMath.Solve(menuMetrics.Factors);
             _rig = CharacterRig.Build(skel, games, assets,
                 Plugin.PmxUnitScale.Value, Plugin.PmxYaw.Value, Plugin.PmxYOffset.Value,
                 skel.gameObject.layer,

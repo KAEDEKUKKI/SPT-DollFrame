@@ -37,10 +37,11 @@ namespace DollFrame.Visibility
             EquipmentSlot.Scabbard,
         };
 
-        private readonly Dictionary<Renderer, ShadowCastingMode> _hidden =
-            new Dictionary<Renderer, ShadowCastingMode>();
+        private readonly Dictionary<Renderer, (ShadowCastingMode mode, bool enabled)> _hidden =
+            new Dictionary<Renderer, (ShadowCastingMode mode, bool enabled)>();
         private readonly HashSet<Renderer> _desiredHidden = new HashSet<Renderer>();
         private readonly List<Renderer> _toRestore = new List<Renderer>();
+        private static readonly List<Renderer> _renderBuf = new List<Renderer>(16);
 
         internal static bool ShouldHide(EquipmentSlot slot) => slot switch
         {
@@ -72,7 +73,7 @@ namespace DollFrame.Visibility
                 foreach (var slot in HolsteredWeaponSlots)
                     CollectSlotRenderers(body, slot, _desiredHidden, inHandsItem);
             }
-            catch { }
+            catch { _desiredHidden.Clear(); return; }
 
             // 釋放不再需要隱藏的渲染器（例如使用者在 F12 即時關閉 HideArmor）
             _toRestore.Clear();
@@ -85,8 +86,9 @@ namespace DollFrame.Visibility
             {
                 if (r != null)
                 {
-                    r.shadowCastingMode = _hidden[r] != ShadowCastingMode.Off ? _hidden[r] : ShadowCastingMode.On;
-                    r.enabled = true;
+                    var orig = _hidden[r];
+                    r.shadowCastingMode = orig.mode != ShadowCastingMode.Off ? orig.mode : ShadowCastingMode.On;
+                    r.enabled = orig.enabled;
                 }
                 _hidden.Remove(r);
             }
@@ -94,7 +96,7 @@ namespace DollFrame.Visibility
             foreach (var r in _desiredHidden)
             {
                 if (!_hidden.ContainsKey(r))
-                    _hidden[r] = r.shadowCastingMode;
+                    _hidden[r] = (r.shadowCastingMode, r.enabled);
                 if (r.enabled) r.enabled = false;
                 if (r.shadowCastingMode != ShadowCastingMode.Off) r.shadowCastingMode = ShadowCastingMode.Off;
             }
@@ -118,25 +120,100 @@ namespace DollFrame.Visibility
             {
                 var r = kv.Key;
                 if (r == null) continue;
-                r.shadowCastingMode = kv.Value != ShadowCastingMode.Off ? kv.Value : ShadowCastingMode.On;
-                r.enabled = true;
+                r.shadowCastingMode = kv.Value.mode != ShadowCastingMode.Off ? kv.Value.mode : ShadowCastingMode.On;
+                r.enabled = kv.Value.enabled;
             }
             _hidden.Clear();
         }
 
-        private static void CollectSlotRenderers(PlayerBody body, EquipmentSlot slot, HashSet<Renderer> into, Item skipItem = null)
+        internal static void CollectSlotRenderers(PlayerBody body, EquipmentSlot slot, HashSet<Renderer> into, Item skipItem = null)
         {
+            if (body == null || body.SlotViews == null || !body.SlotViews.ContainsKey(slot)) return;
             var sv = body.SlotViews.GetByKey(slot);
             if (sv == null) return;
             if (skipItem != null && sv.ContainedItem != null && sv.ContainedItem.Value == skipItem)
                 return;
-            var go = sv.ParentedModel != null ? sv.ParentedModel.Value : null;
-            if (go == null) return;
-            foreach (var r in go.GetComponentsInChildren<Renderer>(true))
+
+            var parentedGo = sv.ParentedModel != null ? sv.ParentedModel.Value : null;
+            var modelGo = sv.Model;
+            if (skipItem != null && (IsUnderWeaponRoot(parentedGo) || IsUnderWeaponRoot(modelGo)))
+                return;
+
+            if (parentedGo != null) AddRenderersInChildren(parentedGo, into);
+            if (modelGo != null && modelGo != parentedGo) AddRenderersInChildren(modelGo, into);
+
+            if (sv.Renderers != null)
             {
-                if (r != null && (r.name == null || !r.name.StartsWith("DollFrame_", StringComparison.Ordinal)))
-                    into.Add(r);
+                for (int i = 0; i < sv.Renderers.Length; i++)
+                    AddIfValid(sv.Renderers[i], into);
             }
+
+            if (sv.MainDress != null && sv.MainDress.Value != null)
+                AddDressRenderers(sv.MainDress.Value, into);
+
+            if (sv.Dresses != null)
+            {
+                for (int i = 0; i < sv.Dresses.Length; i++)
+                    AddDressRenderers(sv.Dresses[i], into);
+            }
+        }
+
+        private static void AddDressRenderers(EFT.Visual.Dress dress, HashSet<Renderer> into)
+        {
+            if (dress == null) return;
+            AddRenderersInChildren(dress.gameObject, into);
+            if (dress.Renderers != null)
+            {
+                for (int i = 0; i < dress.Renderers.Length; i++)
+                    AddIfValid(dress.Renderers[i], into);
+            }
+            try
+            {
+                var bodyR = dress.GetBodyRenderer();
+                if (bodyR.Renderers != null)
+                {
+                    for (int i = 0; i < bodyR.Renderers.Length; i++)
+                        AddIfValid(bodyR.Renderers[i], into);
+                }
+            }
+            catch { }
+            try
+            {
+                var rs = dress.GetRenderers();
+                if (rs != null)
+                {
+                    foreach (var r in rs)
+                        AddIfValid(r, into);
+                }
+            }
+            catch { }
+        }
+
+        private static void AddRenderersInChildren(GameObject go, HashSet<Renderer> into)
+        {
+            if (go == null) return;
+            _renderBuf.Clear();
+            go.GetComponentsInChildren(true, _renderBuf);
+            for (int i = 0; i < _renderBuf.Count; i++)
+                AddIfValid(_renderBuf[i], into);
+        }
+
+        private static bool IsUnderWeaponRoot(GameObject go)
+        {
+            if (go == null) return false;
+            for (var t = go.transform; t != null; t = t.parent)
+            {
+                var n = t.name;
+                if (!string.IsNullOrEmpty(n) && n.StartsWith("Weapon_root", StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+            return false;
+        }
+
+        private static void AddIfValid(Renderer r, HashSet<Renderer> into)
+        {
+            if (r != null && (r.name == null || !r.name.StartsWith("DollFrame_", StringComparison.Ordinal)))
+                into.Add(r);
         }
     }
 }

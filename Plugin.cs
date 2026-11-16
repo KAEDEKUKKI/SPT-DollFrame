@@ -17,7 +17,7 @@ namespace DollFrame
     /// Scales the vanilla Tarkov player skeleton at player-body init so imported
     /// (unchanged) models fit; compensates the movement capsule; refreshes IK.
     /// </summary>
-    [BepInPlugin("DollFrame", "DollFrame", "0.4.0")]
+    [BepInPlugin("DollFrame", "DollFrame", "0.4.1")]
     public class Plugin : BaseUnityPlugin
     {
         internal static Plugin Instance;
@@ -31,14 +31,10 @@ namespace DollFrame
         internal static ConfigEntry<float> PmxUnitScale;
         internal static ConfigEntry<float> PmxYOffset;
         internal static ConfigEntry<int> MaxTextureSize;
-        internal static ConfigEntry<bool> FlipUv;
         internal static ConfigEntry<bool> HideModelAccessories;
         internal static ConfigEntry<string> HideModelAccessoriesList;
         internal static ConfigEntry<float> PmxYaw;
         internal static ConfigEntry<int> IdleCacheSize;
-        internal static ConfigEntry<bool> ProportionScale;
-        internal static ConfigEntry<bool> HideHeadInFp;
-        internal static ConfigEntry<bool> ArmIkRetarget;
         internal static ConfigEntry<bool> ReplaceVoice;
         internal static ConfigEntry<bool> SecondaryPhysics;
         internal static ConfigEntry<bool> EnableRimLight;
@@ -53,10 +49,6 @@ namespace DollFrame
         internal static ConfigEntry<bool> HideEyewear;
         internal static ConfigEntry<bool> HideEarpiece;
         internal static ConfigEntry<bool> HideArmBand;
-        internal static ConfigEntry<KeyCode> SwitchKey;
-
-        /// <summary>Awake 時掃出的角色名單（含 Vanilla (PMC) 置頂）＝選單熱鍵的循環順序。</summary>
-        private static string[] _menuOptions = Array.Empty<string>();
 
         private void Awake()
         {
@@ -74,10 +66,7 @@ namespace DollFrame
                 "Replace the body with the packaged character (independent per-character rig + model-side proportion scaling). Default OFF: the menu preview and card still work, and the module writes nothing to the player in raids (fully vanilla motion/camera). Turning it on applies PMX character folders from Characters in raids.");
             var modelOptions = DiscoverPackages();
             var defaultModel = modelOptions.FirstOrDefault(o => o.Contains("克萊妲")) ?? modelOptions.FirstOrDefault() ?? "";
-            Character = Config.Bind("Visual", "Character", defaultModel, new ConfigDescription("Character to import from BepInEx/plugins/DollFrame/Characters/<folder>. Hidden from this window (switch in-game: the DollFrame row on the menu Overall screen, or the switch key); the value persists here.", modelOptions.Length > 0 ? new AcceptableValueList<string>(modelOptions) : null, new BrowsableAttribute(false)));
-            SwitchKey = Config.Bind("Visual", "Switch character key", KeyCode.PageUp,
-                "Cycle the Visual/Character selection with a single key press (main menu only - ignored while a raid/hideout session is running, so a switch can never apply mid-session). Replaces opening the config manager (F12) to change characters. New character folders need a game restart to appear in the cycle.");
-            _menuOptions = modelOptions;
+            Character = Config.Bind("Visual", "Character", defaultModel, new ConfigDescription("Character to import from BepInEx/plugins/DollFrame/Characters/<folder>. Hidden from this window (switch in-game: the DollFrame row on the menu Overall screen); the value persists here.", modelOptions.Length > 0 ? new AcceptableValueList<string>(modelOptions) : null, new BrowsableAttribute(false)));
             if (modelOptions.Length == 0)
                 Log.LogWarning($"[DollFrame] no character packages found in '{CharactersDirectory}'; Character falls back to a text field");
             PmxUnitScale = Config.Bind("Visual", "PMX unit scale", 0.078f,
@@ -86,8 +75,6 @@ namespace DollFrame
                 "Vertical correction if the model floats or sinks into the ground.");
             MaxTextureSize = Config.Bind("Visual", "Max texture size", 2048,
                 "Textures larger than this are downscaled on load (VRAM).");
-            FlipUv = Config.Bind("Visual", "Flip UV", true,
-                "PMX uses DirectX-style V top-down; Unity textures are bottom-up. Turn off if textures appear upside down.");
             HideModelAccessories = Config.Bind("Visual", "Hide model accessories", true,
                 "Hide materials of weapons/guns/bags authored into the model (she should carry the in-game weapon instead).");
             HideModelAccessoriesList = Config.Bind("Visual", "Hide accessories name filter", "gun, glock, bag, butt, weapon, silencer",
@@ -97,12 +84,18 @@ namespace DollFrame
             IdleCacheSize = Config.Bind("Visual", "Idle cache size", 4,
                 new ConfigDescription("Idle parsed-character cache capacity (LRU). Browsing more characters than this re-parses the evicted package on the next switch (a 250-460ms hitch); bigger values keep more models warm at the cost of texture VRAM.", new AcceptableValueRange<int>(2, 24)));
             PmxAssets.SetIdleCap(IdleCacheSize.Value);
-ProportionScale = Config.Bind("Visual", "Scale model to game proportions", true,
-"模型側全模型單一等比縮放（2026-11-14-6 改約）：Build 時於 rig 根一次性乘入腿錨定等比因子 k（k＝遊戲腿鏈長/模型腿鏈長），全身逐位保持作者原始比例（手指/手臂不變形），腳仍貼齊遊戲 FBAK 腿鏈；遊戲骨架全程 pristine。臂鏈個別縮放已退役（其曾使手臂/手指相對軀幹拉長）。");
-            HideHeadInFp = Config.Bind("Visual", "Hide head in first person", true,
-                "第一人稱頭部 SMR 切換 ShadowsOnly（防頭部穿透相機並保留地面頭部陰影）；第三人稱／死亡一律完整渲染。");
-            ArmIkRetarget = Config.Bind("Visual", "IK arm retarget to game hands", true,
-                "臂鏈 IK 重定向（2026-11-14-9）：上臂/前臂改由兩骨 IK 求解，手端沿遊戲肩→掌方向伸展至模型臂長（ArmRatio ≈0.83–0.95）落點——TP 手部自然持槍姿勢。每幀仍僅寫 localRotation（零 localPosition/localScale 寫入，零拉伸契約不變），手腕/十指維持 palmL/R 原複製；胸腔 SDF 防肘入軀幹；死亡/布娃娃自動回退 FK 複製。Build 時讀取，變更需重新掛載（切換角色或重進戰局）。");
+            IdleCacheSize.SettingChanged += (_, __) => PmxAssets.SetIdleCap(IdleCacheSize.Value);
+            ReplaceBody.SettingChanged += (_, __) =>
+            {
+                if (!ReplaceBody.Value)
+                {
+                    foreach (var br in UnityEngine.Object.FindObjectsOfType<BodyReplacer>())
+                    {
+                        if (br != null) UnityEngine.Object.DestroyImmediate(br);
+                    }
+                    PreviewProxyDriver.NotifyAllCharacterChanged();
+                }
+            };
             ReplaceVoice = Config.Bind("Visual", "Replace player voice", true,
                 "選擇角色建模時自動替換玩家語音（Voices/<角色家族>/）；切回 Vanilla (PMC) 時還原原版語音。");
             SecondaryPhysics = Config.Bind("Visual", "Enable secondary physics", true,
@@ -154,37 +147,6 @@ ProportionScale = Config.Bind("Visual", "Scale model to game proportions", true,
             Log.LogInfo($"DollFrame loaded (Replace player body={ReplaceBody.Value}, {count} patched methods, {modelOptions.Length} character models)");
         }
 
-        private static float _lastBlockedLog;
-
-        private void Update()
-        {
-            try
-            {
-                var key = SwitchKey?.Value ?? KeyCode.None;
-                if (key == KeyCode.None || !Input.GetKeyDown(key)) return;
-                if (!CanSwitchInMenu())
-                {
-                    if (Time.unscaledTime - _lastBlockedLog > 2f)
-                    {
-                        _lastBlockedLog = Time.unscaledTime;
-                        Log.LogInfo("[DollFrame] character switch key ignored outside the main menu (needs the menu preview up and no raid/hideout session)");
-                    }
-                    return;
-                }
-                var opts = _menuOptions.Length > 0 ? _menuOptions : DiscoverPackages();
-                if (opts.Length == 0) return;
-                var prev = Character?.Value;
-                var idx = Array.IndexOf(opts, prev);
-                Character.Value = opts[(idx + 1) % opts.Length];
-                Log.LogInfo($"[DollFrame] character switch -> '{Character.Value}'");
-                NotifyCharacterChanged();
-            }
-            catch (Exception e)
-            {
-                Log.LogError($"[DollFrame] character switch failed: {e}");
-            }
-        }
-
         internal static void NotifyCharacterChanged()
         {
             try
@@ -204,20 +166,6 @@ ProportionScale = Config.Bind("Visual", "Scale model to game proportions", true,
             {
                 Log.LogWarning($"[DollFrame] character change sync failed: {e.Message}");
             }
-        }
-
-        /// <summary>主選單判準：存在活著的 menu 預覽 driver（PlayerModelView 在場），且不在戰局中。</summary>
-        private static bool CanSwitchInMenu()
-        {
-            if (!PreviewProxyDriver.HasLiveView) return false;
-            // 藏身處 HideoutPlayer 留在後台記憶體不應阻礙主選單切換；僅在進入正式戰局且有非藏身處玩家時阻擋
-            foreach (var br in UnityEngine.Object.FindObjectsOfType<BodyReplacer>())
-            {
-                var p = br._player;
-                if (p != null && p.IsYourPlayer && !(p is HideoutPlayer))
-                    return false;
-            }
-            return true;
         }
 
         /// <summary>Primary character folder next to DollFrame.dll.</summary>

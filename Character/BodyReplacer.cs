@@ -39,6 +39,7 @@ namespace DollFrame
         private readonly VanillaBodyHider _vanillaHider = new VanillaBodyHider();
         private readonly DollFrame.Visibility.EquipmentSlotHider _equipHider = new DollFrame.Visibility.EquipmentSlotHider();
         private float _lastEquipSyncTime = -10f;
+        private EFT.InventoryLogic.Item _lastInHandsItem;
         private Func<(bool fp, bool alive)> _povQuery;
         private (bool fp, bool alive) _lastPov = (false, true);
         private float _lastLateUpdateErrorTime;
@@ -72,8 +73,20 @@ namespace DollFrame
         {
             if (player == null) return;
             var existing = player.gameObject.GetComponent<BodyReplacer>();
-            ReleaseAndDestroy(existing, suppressRestore: !VanillaSelection.IsVanilla(Plugin.Character?.Value));
+            if (!Plugin.ReplaceBody.Value || VanillaSelection.IsVanilla(Plugin.Character?.Value))
+            {
+                ReleaseAndDestroy(existing, suppressRestore: false);
+                Apply(player);
+                return;
+            }
+            ReleaseAndDestroy(existing, suppressRestore: true);
             Apply(player);
+            if (player.gameObject.GetComponent<BodyReplacer>() == null)
+            {
+                VanillaBodyHider.RestoreAllVanilla(player);
+                CapsulePatches.ApplyScale(player, 1f);
+                VoiceReplacer.Restore(player);
+            }
         }
 
         internal static void Apply(Player player)
@@ -88,7 +101,6 @@ namespace DollFrame
                 VanillaBodyHider.RestoreAllVanilla(player);
                 CapsulePatches.ApplyScale(player, 1f);
                 VoiceReplacer.Restore(player);
-                IkRefresh.RefreshIK(player);
                 return;
             }
 
@@ -131,6 +143,7 @@ namespace DollFrame
                 return;
             }
 
+            string acquiredPkgName = null;
             try
             {
                 RemoveStraySkins(player, null, null);
@@ -151,13 +164,14 @@ namespace DollFrame
                 var raidDump = GameBones.GameRigDump(rootJoint);
 
                 var assets = PmxAssets.LoadOrAcquire(packagePath, Plugin.MaxTextureSize.Value,
-                    Plugin.FlipUv.Value, AccessoryFilter.FromConfig(),
+                    true, AccessoryFilter.FromConfig(),
                     out var pkgName, out var warm, out var preloadMs);
                 if (assets == null)
                 {
                     Plugin.Log.LogWarning($"[DollFrame] package '{pkgName}' failed to load - body not replaced this init");
                     return;
                 }
+                acquiredPkgName = pkgName;
                 if (!warm)
                     Plugin.Log.LogInfo($"[DollFrame] preload: {pkgName} {preloadMs:0.##}ms (cold)");
 
@@ -165,9 +179,7 @@ namespace DollFrame
                 LastFactorsByPackage[pkgName] = metrics.Factors;
 
                 // 全模型單一等比縮放因子（2026-11-14-6：腿錨定 uniform k，臂鏈縮放退役）
-                ModelScaleMath.ScalePlan? scale = null;
-                if (Plugin.ProportionScale.Value)
-                    scale = ModelScaleMath.Solve(metrics.Factors);
+                var scale = ModelScaleMath.Solve(metrics.Factors);
 
                 // 縮放後模型身高 → 膠囊補償輸入（全身 uniform 等比，身高精確隨 k）
                 float scaledHeightM = scale.HasValue
@@ -197,6 +209,7 @@ namespace DollFrame
                 comp._skinMesh = rig.Mesh;
                 comp._headMesh = rig.HeadMesh;
                 comp._pkgName = pkgName;
+                acquiredPkgName = null;
                 comp._rootJoint = rootJoint;
                 comp._vanillaHider.SyncVanillaHidden(player);
                 comp._equipHider.Sync(player.PlayerBody, SafeHandsController(player)?.Item);
@@ -213,9 +226,10 @@ namespace DollFrame
                     catch { return (false, true); }
                 };
                 Stats.Builds++;
-                comp._skin.gameObject.layer = comp._vanillaHider.PickLayer(player);
+                int bodyLayer = comp._vanillaHider.PickLayer(player);
+                if (comp._skin != null) comp._skin.gameObject.layer = bodyLayer;
                 if (comp._rig != null && comp._rig.HeadSkin != null)
-                    comp._rig.HeadSkin.gameObject.layer = comp._skin.gameObject.layer;
+                    comp._rig.HeadSkin.gameObject.layer = bodyLayer;
                 if (comp._rig != null)
                 {
                     var hc = SafeHandsController(player);
@@ -235,6 +249,7 @@ namespace DollFrame
             }
             catch (Exception e)
             {
+                if (acquiredPkgName != null) PmxAssets.Release(acquiredPkgName);
                 Plugin.Log.LogError($"[DollFrame] body replace failed: {e}");
             }
         }
@@ -242,6 +257,11 @@ namespace DollFrame
         private void LateUpdate()
         {
             if (_player == null) return;
+            if (!Plugin.ReplaceBody.Value)
+            {
+                ReleaseAndDestroy(this, suppressRestore: false);
+                return;
+            }
 
             try
             {
@@ -299,7 +319,7 @@ namespace DollFrame
                 if (_povQuery != null)
                 {
                     var (fp, alive) = povNow;
-                    bool masked = fp && Plugin.HideHeadInFp.Value;
+                    bool masked = fp;
                     if (masked != _lastPov.fp || alive != _lastPov.alive || _headMaskFirstApply)
                     {
                         _lastPov = (masked, alive);
@@ -307,16 +327,18 @@ namespace DollFrame
                         _headMask.SetPointOfView(
                             masked ? PointOfView.FirstPerson : PointOfView.ThirdPerson,
                             _skin, _headSkin, isAiming: false, isAlive: alive);
-                        Plugin.Log.LogInfo($"[DollFrame] fp head mask: {(masked ? "ShadowsOnly" : "On")} ({(alive ? "alive" : "dead")})");
+                        Plugin.Log.LogInfo($"[DollFrame] fp head mask: {(alive && masked ? "ShadowsOnly" : "On")} ({(alive ? "alive" : "dead")})");
                     }
                 }
 
                 // Vanilla Body Hiding & Own-Player Equipment Slot Hiding
                 _vanillaHider.EnforceHiddenEveryFrame();
-                if (Time.unscaledTime - _lastEquipSyncTime > 0.5f)
+                var curInHands = hcNow?.Item;
+                if (!ReferenceEquals(curInHands, _lastInHandsItem) || Time.unscaledTime - _lastEquipSyncTime > 0.5f)
                 {
+                    _lastInHandsItem = curInHands;
                     _lastEquipSyncTime = Time.unscaledTime;
-                    _equipHider.Sync(_player.PlayerBody, hcNow?.Item);
+                    _equipHider.Sync(_player.PlayerBody, curInHands);
                 }
                 _equipHider.EnforceEveryFrame();
             }
@@ -377,7 +399,7 @@ namespace DollFrame
 
         private void OnCameraPreCull(UnityEngine.Camera cam)
         {
-            if (_player == null || _rig == null) return;
+            if (_player == null || _rig == null || !Plugin.ReplaceBody.Value) return;
             int frame = Time.frameCount;
             if (_lastPreCullFrame == frame) return;
             _lastPreCullFrame = frame;
@@ -411,7 +433,6 @@ namespace DollFrame
                         try { VanillaBodyHider.RestoreAllVanilla(_player); } catch (Exception ex) { Plugin.Log.LogWarning($"[DollFrame] OnDestroy RestoreAllVanilla error: {ex.Message}"); }
                         try { CapsulePatches.ApplyScale(_player, 1f); } catch (Exception ex) { Plugin.Log.LogWarning($"[DollFrame] OnDestroy CapsulePatches.ApplyScale error: {ex.Message}"); }
                         try { VoiceReplacer.Restore(_player); } catch (Exception ex) { Plugin.Log.LogWarning($"[DollFrame] OnDestroy VoiceReplacer.Restore error: {ex.Message}"); }
-                        try { IkRefresh.RefreshIK(_player); } catch (Exception ex) { Plugin.Log.LogWarning($"[DollFrame] OnDestroy RefreshIK error: {ex.Message}"); }
                     }
                 }
             }
