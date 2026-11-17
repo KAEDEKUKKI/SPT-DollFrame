@@ -99,15 +99,24 @@ namespace DollFrame
             Shader.SetGlobalColor(PropRimTint, tint);
         }
 
-        /// <summary>依材質類別套用 PBR 參數、Cutout/Transparent 混合模式與邊緣光／掠射光澤權重。</summary>
+        /// <summary>依材質類別套用 PBR 參數、法線貼圖、Cutout/Transparent 混合模式與邊緣光／掠射光澤權重。</summary>
         internal static void ConfigureMaterial(
-            Material m, string matName, float metallic, float smoothness, float alpha, bool isTransparent, bool isCutout = false)
+            Material m, string matName, float metallic, float smoothness, float alpha, bool isTransparent, bool isCutout = false,
+            Texture2D normalMap = null, float bumpScale = 0.4f)
         {
             if (m == null) return;
 
             m.color = new Color(1f, 1f, 1f, isTransparent ? alpha : 1f);
             m.SetFloat("_Glossiness", smoothness);
             m.SetFloat("_Metallic", metallic);
+
+            if (normalMap != null && m.HasProperty("_BumpMap"))
+            {
+                m.SetTexture("_BumpMap", normalMap);
+                if (m.HasProperty("_BumpScale"))
+                    m.SetFloat("_BumpScale", bumpScale);
+                m.EnableKeyword("_NORMALMAP");
+            }
 
             if (isTransparent)
             {
@@ -134,7 +143,7 @@ namespace DollFrame
             m.SetColor("_RimColor", rimColor);
             m.SetFloat("_RimIntensity", rimIntensity);
             m.SetFloat("_RimPower", rimPower);
-            m.SetFloat("_RimAmbientAdapt", 0.85f);
+            m.SetFloat("_RimAmbientAdapt", 0.90f);
             m.SetColor("_SheenColor", Color.white);
             m.SetFloat("_SheenIntensity", sheenIntensity);
         }
@@ -142,24 +151,24 @@ namespace DollFrame
         private static (Color rimColor, float rimIntensity, float rimPower, float sheenIntensity) ClassifyStylizedLook(string name)
         {
             if (string.IsNullOrEmpty(name))
-                return (new Color(0.78f, 0.88f, 1.0f, 1f), 0.90f, 3.2f, 0.12f);
+                return (new Color(0.80f, 0.88f, 1.0f, 1f), 0.55f, 3.4f, 0.08f);
 
             if (Contains(name, "eye") || Contains(name, "瞳") || Contains(name, "iris"))
-                return (new Color(0.85f, 0.92f, 1.0f, 1f), 0.18f, 4.0f, 0.04f);
+                return (new Color(0.85f, 0.92f, 1.0f, 1f), 0.16f, 4.2f, 0.03f);
 
             if (Contains(name, "face") || Contains(name, "skin") || Contains(name, "body") || Contains(name, "肌") || Contains(name, "顔"))
-                return (new Color(1.0f, 0.88f, 0.82f, 1f), 0.55f, 3.6f, 0.10f);
+                return (new Color(1.0f, 0.86f, 0.78f, 1f), 0.26f, 4.0f, 0.03f);
 
             if (Contains(name, "hair") || Contains(name, "髪"))
-                return (new Color(0.85f, 0.93f, 1.0f, 1f), 0.95f, 3.0f, 0.18f);
+                return (new Color(0.85f, 0.93f, 1.0f, 1f), 0.72f, 3.3f, 0.14f);
 
             if (Contains(name, "metal") || Contains(name, "steel") || Contains(name, "gold") || Contains(name, "silver") || Contains(name, "armor") || Contains(name, "plate") || Contains(name, "buck"))
-                return (new Color(0.82f, 0.90f, 1.0f, 1f), 1.05f, 2.8f, 0.06f);
+                return (new Color(0.85f, 0.92f, 1.0f, 1f), 0.85f, 3.0f, 0.04f);
 
             if (Contains(name, "leather") || Contains(name, "belt") || Contains(name, "boot") || Contains(name, "glove") || Contains(name, "shoe") || Contains(name, "stocking") || Contains(name, "tight"))
-                return (new Color(0.80f, 0.88f, 1.0f, 1f), 1.00f, 3.0f, 0.22f);
+                return (new Color(0.82f, 0.89f, 1.0f, 1f), 0.68f, 3.2f, 0.16f);
 
-            return (new Color(0.78f, 0.88f, 1.0f, 1f), 0.88f, 3.2f, 0.14f);
+            return (new Color(0.80f, 0.88f, 1.0f, 1f), 0.55f, 3.4f, 0.08f);
         }
 
         private static bool Contains(string haystack, string needle) =>

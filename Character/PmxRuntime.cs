@@ -776,23 +776,23 @@ namespace DollFrame
         /// </summary>
         private static (int matMode, float metallic, float smoothness) ClassifyMaterial(string matName)
         {
-            if (string.IsNullOrEmpty(matName)) return (0, 0f, 0.26f);
+            if (string.IsNullOrEmpty(matName)) return (0, 0f, 0.16f);
             var s = matName.ToLowerInvariant();
-            if (s == "face" || s.Contains("face") || s.Contains("顔")) return (3, 0f, 0.28f);
+            if (s == "face" || s.Contains("face") || s.Contains("顔")) return (3, 0f, 0.15f);
             if (s.Contains("eye") || s.Contains("hitomi") || s.Contains("lash") || s.Contains("brow") || s.Contains("瞳") || s.Contains("まつ毛"))
                 return (0, 0f, 0.65f);
-            if (s.Contains("skin") || s.Contains("肌") || s.Contains("素体")) return (1, 0f, 0.34f);
-            if (s.Contains("hair") || s.Contains("kami") || s.Contains("髪")) return (2, 0f, 0.48f);
+            if (s.Contains("skin") || s.Contains("肌") || s.Contains("素体")) return (1, 0f, 0.18f);
+            if (s.Contains("hair") || s.Contains("kami") || s.Contains("髪")) return (2, 0f, 0.36f);
             if (s.Contains("metal") || s.Contains("iron") || s.Contains("steel") || s.Contains("gold") || s.Contains("silver") ||
                 s.Contains("buckle") || s.Contains("zip") || s.Contains("button") || s.Contains("armor") ||
                 s.Contains("金属") || s.Contains("鉄") || s.Contains("鋼") || s.Contains("金具"))
-                return (0, 0.78f, 0.72f);
+                return (0, 0.82f, 0.72f);
             if (s.Contains("leather") || s.Contains("boot") || s.Contains("shoe") || s.Contains("belt") || s.Contains("strap") || s.Contains("glove") ||
                 s.Contains("革") || s.Contains("靴") || s.Contains("ベルト") || s.Contains("手袋"))
-                return (0, 0.06f, 0.52f);
+                return (0, 0.05f, 0.42f);
             if (s.Contains("cloth") || s.Contains("cth") || s.Contains("dorm") || s.Contains("sock"))
-                return (0, 0f, 0.26f);
-            return (0, 0f, 0.28f);
+                return (0, 0f, 0.14f);
+            return (0, 0f, 0.16f);
         }
 
         /// <summary>Built from one packaged character (name/Pmx/Textures, see PmxContainer).</summary>
@@ -843,6 +843,8 @@ namespace DollFrame
             if (opaqueShader == null)
                 Plugin.Log.LogError("[DollFrame] Character shader not found; materials will be unlit pink");
             var materials = new List<Material>();
+            var extraTextures = new List<Texture2D>();
+            var normalMapCache = new Dictionary<string, Texture2D>();
             int doubleSided = 0;
             try
             {
@@ -873,13 +875,34 @@ namespace DollFrame
                     name = "DollFrame_" + mat.Name,
                     hideFlags = HideFlags.DontUnloadUnusedAsset
                 };
-                if (mat.TexIdx >= 0 && textures.TryGetValue(mat.TexIdx, out var tex))
-                    m.mainTexture = tex;
+                Texture2D diffuseTex = null;
+                if (mat.TexIdx >= 0 && textures.TryGetValue(mat.TexIdx, out diffuseTex))
+                    m.mainTexture = diffuseTex;
+
+                Texture2D normalMap = null;
+                float bumpScale = 0.35f;
+                if (!isTransparent && !isCutout && !IsFaceOrEyeMaterial(mat.Name) && m.HasProperty("_BumpMap"))
+                {
+                    var kind = ClassifySurfaceKind(mat.Name);
+                    bumpScale = GetBumpScale(kind);
+                    string cacheNormalKey = $"{mat.TexIdx}:{(int)kind}";
+                    if (!normalMapCache.TryGetValue(cacheNormalKey, out normalMap))
+                    {
+                        normalMap = TryLoadCompanionNormalMap(texPath, textureBytes, maxTexSize);
+                        if (normalMap == null && diffuseTex != null)
+                            normalMap = GenerateMicroNormalMap(diffuseTex, kind, maxTexSize);
+                        if (normalMap != null)
+                        {
+                            normalMapCache[cacheNormalKey] = normalMap;
+                            extraTextures.Add(normalMap);
+                        }
+                    }
+                }
+
                 var (_, metallic, smoothness) = ClassifyMaterial(mat.Name);
-                ShaderManager.ConfigureMaterial(m, mat.Name, metallic, smoothness, tint.a, isTransparent, isCutout);
+                ShaderManager.ConfigureMaterial(m, mat.Name, metallic, smoothness, tint.a, isTransparent, isCutout, normalMap, bumpScale);
                 if (i == faceMatIdx) faceSlot = materials.Count;
-                // Standard has no cull property; double-sided materials get back-face
-                // triangles duplicated in the mesh instead (see below)
+                // Double-sided materials duplicate back-face vertices with negated normals in BuildUnityMesh
                 materials.Add(m);
             }
             a.Materials = materials.ToArray();
@@ -891,7 +914,17 @@ namespace DollFrame
                     a.SdfFace = SdfFaceLoader.Build(pmx, textureBytes, faceMatIdx, faceF, faceR, flipUv, cacheDir);
             }
             a.UnresolvedTextures = unresolved.ToArray();
-            a.Textures = textures.Values.ToArray();
+            if (extraTextures.Count > 0)
+            {
+                var allTex = new Texture2D[textures.Count + extraTextures.Count];
+                textures.Values.CopyTo(allTex, 0);
+                extraTextures.CopyTo(allTex, textures.Count);
+                a.Textures = allTex;
+            }
+            else
+            {
+                a.Textures = textures.Values.ToArray();
+            }
 
             // Split mesh into Body and Head by bone weights for first-person hiding + 100% full-body ground shadows
             var (bodyMesh, headMesh) = MeshSplitter.SplitMeshByBones(pmx, null);
@@ -924,6 +957,7 @@ namespace DollFrame
             catch
             {
                 foreach (var tex in textures.Values) if (tex != null) UnityEngine.Object.Destroy(tex);
+                foreach (var tex in extraTextures) if (tex != null) UnityEngine.Object.Destroy(tex);
                 foreach (var mat in materials) if (mat != null) UnityEngine.Object.Destroy(mat);
                 if (a.Mesh != null) UnityEngine.Object.Destroy(a.Mesh);
                 if (a.HeadMesh != null) UnityEngine.Object.Destroy(a.HeadMesh);
@@ -955,65 +989,93 @@ namespace DollFrame
             }
             outSkinBones = skinBones.ToArray();
 
-            var weights = new BoneWeight[pmxMesh.Weights.Length];
-            for (int i = 0; i < weights.Length; i++)
+            var baseCount = pmxMesh.Pos.Length;
+            var verts = new List<Vector3>(pmxMesh.Pos);
+            var norms = new List<Vector3>(pmxMesh.Normals);
+            var uvs = new List<Vector2>(baseCount);
+            for (int i = 0; i < pmxMesh.Uv.Length; i++)
+                uvs.Add(flipUv ? new Vector2(pmxMesh.Uv[i].x, 1f - pmxMesh.Uv[i].y) : pmxMesh.Uv[i]);
+
+            var bws = new List<BoneWeight>(baseCount);
+            for (int i = 0; i < pmxMesh.Weights.Length; i++)
             {
                 var w = pmxMesh.Weights[i];
-                weights[i] = new BoneWeight
+                bws.Add(new BoneWeight
                 {
                     boneIndex0 = slotOf[w.boneIndex0], boneIndex1 = slotOf[w.boneIndex1],
                     boneIndex2 = slotOf[w.boneIndex2], boneIndex3 = slotOf[w.boneIndex3],
                     weight0 = w.weight0, weight1 = w.weight1, weight2 = w.weight2, weight3 = w.weight3
-                };
+                });
             }
 
             var binds = new Matrix4x4[outSkinBones.Length];
             for (int i = 0; i < binds.Length; i++)
                 binds[i] = Matrix4x4.Translate(-pmx.Bones[outSkinBones[i]].Pos);
 
-            var mesh = new Mesh
-            {
-                name = meshName,
-                hideFlags = HideFlags.DontUnloadUnusedAsset
-            };
-            mesh.indexFormat = pmxMesh.Pos.Length > 65000 ? IndexFormat.UInt32 : IndexFormat.UInt16;
-            mesh.vertices = pmxMesh.Pos;
-            mesh.normals = pmxMesh.Normals;
-            var uv = new Vector2[pmxMesh.Uv.Length];
-            for (int i = 0; i < pmxMesh.Uv.Length; i++)
-                uv[i] = flipUv ? new Vector2(pmxMesh.Uv[i].x, 1f - pmxMesh.Uv[i].y) : pmxMesh.Uv[i];
-            mesh.uv = uv;
-            mesh.boneWeights = weights;
-            mesh.bindposes = binds;
-            mesh.subMeshCount = keptMaterialIdx.Length;
-
+            int[] backVertOf = null;
+            var submeshTris = new int[keptMaterialIdx.Length][];
             for (int s = 0; s < keptMaterialIdx.Length; s++)
             {
                 int mi = keptMaterialIdx[s];
                 var tris = pmxMesh.MaterialTris != null && mi < pmxMesh.MaterialTris.Length ? pmxMesh.MaterialTris[mi] : null;
                 if (tris == null || tris.Length == 0)
                 {
-                    mesh.SetTriangles(Array.Empty<int>(), s, false);
+                    submeshTris[s] = Array.Empty<int>();
                     continue;
                 }
                 if (pmx.Mats[mi].DoubleSided && tris.Length >= 3)
                 {
+                    if (backVertOf == null)
+                    {
+                        backVertOf = new int[baseCount];
+                        for (int i = 0; i < baseCount; i++) backVertOf[i] = -1;
+                    }
                     var both = new int[tris.Length * 2];
                     Array.Copy(tris, both, tris.Length);
                     for (int t = 0; t + 2 < tris.Length; t += 3)
                     {
-                        both[tris.Length + t] = tris[t];
-                        both[tris.Length + t + 1] = tris[t + 2];
-                        both[tris.Length + t + 2] = tris[t + 1];
+                        both[tris.Length + t] = GetOrCreateBackVertex(tris[t], backVertOf, verts, norms, uvs, bws);
+                        both[tris.Length + t + 1] = GetOrCreateBackVertex(tris[t + 2], backVertOf, verts, norms, uvs, bws);
+                        both[tris.Length + t + 2] = GetOrCreateBackVertex(tris[t + 1], backVertOf, verts, norms, uvs, bws);
                     }
                     tris = both;
                     doubleSidedCount++;
                 }
-                mesh.SetTriangles(tris, s, false);
+                submeshTris[s] = tris;
             }
+
+            var mesh = new Mesh
+            {
+                name = meshName,
+                hideFlags = HideFlags.DontUnloadUnusedAsset
+            };
+            mesh.indexFormat = verts.Count > 65000 ? IndexFormat.UInt32 : IndexFormat.UInt16;
+            mesh.SetVertices(verts);
+            mesh.SetNormals(norms);
+            mesh.SetUVs(0, uvs);
+            mesh.boneWeights = bws.ToArray();
+            mesh.bindposes = binds;
+            mesh.subMeshCount = keptMaterialIdx.Length;
+            for (int s = 0; s < keptMaterialIdx.Length; s++)
+                mesh.SetTriangles(submeshTris[s], s, false);
             mesh.RecalculateTangents();
             mesh.RecalculateBounds();
             return mesh;
+        }
+
+        private static int GetOrCreateBackVertex(
+            int srcIdx, int[] backVertOf,
+            List<Vector3> verts, List<Vector3> norms, List<Vector2> uvs, List<BoneWeight> bws)
+        {
+            int idx = backVertOf[srcIdx];
+            if (idx >= 0) return idx;
+            idx = verts.Count;
+            backVertOf[srcIdx] = idx;
+            verts.Add(verts[srcIdx]);
+            norms.Add(-norms[srcIdx]);
+            uvs.Add(uvs[srcIdx]);
+            bws.Add(bws[srcIdx]);
+            return idx;
         }
 
         private static void MarkUsed(BoneWeight w, bool[] used)        {
@@ -1025,6 +1087,183 @@ namespace DollFrame
 
         private static bool IsAccessory(PmxParser.PmxModel pmx, int matIdx, string[] patterns)
             => AccessoryFilter.IsAccessory(pmx, matIdx, patterns);
+
+        private enum SurfaceKind { Cloth, Skin, Hair, Leather, Metal }
+
+        private static bool IsFaceOrEyeMaterial(string matName)
+        {
+            if (string.IsNullOrEmpty(matName)) return false;
+            var s = matName.ToLowerInvariant();
+            return s == "face" || s.Contains("face") || s.Contains("顔") ||
+                   s.Contains("eye") || s.Contains("hitomi") || s.Contains("lash") ||
+                   s.Contains("brow") || s.Contains("瞳") || s.Contains("まつ毛");
+        }
+
+        private static SurfaceKind ClassifySurfaceKind(string matName)
+        {
+            if (string.IsNullOrEmpty(matName)) return SurfaceKind.Cloth;
+            var s = matName.ToLowerInvariant();
+            if (s.Contains("skin") || s.Contains("肌") || s.Contains("素体")) return SurfaceKind.Skin;
+            if (s.Contains("hair") || s.Contains("kami") || s.Contains("髪")) return SurfaceKind.Hair;
+            if (s.Contains("metal") || s.Contains("iron") || s.Contains("steel") || s.Contains("gold") || s.Contains("silver") ||
+                s.Contains("buckle") || s.Contains("zip") || s.Contains("button") || s.Contains("armor") ||
+                s.Contains("金属") || s.Contains("鉄") || s.Contains("鋼") || s.Contains("金具"))
+                return SurfaceKind.Metal;
+            if (s.Contains("leather") || s.Contains("boot") || s.Contains("shoe") || s.Contains("belt") || s.Contains("strap") || s.Contains("glove") ||
+                s.Contains("革") || s.Contains("靴") || s.Contains("ベルト") || s.Contains("手袋"))
+                return SurfaceKind.Leather;
+            return SurfaceKind.Cloth;
+        }
+
+        private static float GetBumpScale(SurfaceKind kind) => kind switch
+        {
+            SurfaceKind.Leather => 0.55f,
+            SurfaceKind.Cloth => 0.45f,
+            SurfaceKind.Metal => 0.40f,
+            SurfaceKind.Hair => 0.35f,
+            SurfaceKind.Skin => 0.15f,
+            _ => 0.35f
+        };
+
+        private static readonly string[] NormalSuffixes = { "_n", "_normal", "_bump", "_nrm", "_N", "_Normal" };
+        private static readonly string[] NormalExts = { ".png", ".jpg", ".jpeg" };
+
+        private static Texture2D TryLoadCompanionNormalMap(string diffuseRelPath, Dictionary<string, byte[]> textureBytes, int maxTexSize)
+        {
+            if (string.IsNullOrEmpty(diffuseRelPath) || textureBytes == null) return null;
+            string dir = Path.GetDirectoryName(diffuseRelPath) ?? "";
+            string stem = Path.GetFileNameWithoutExtension(diffuseRelPath);
+            if (string.IsNullOrEmpty(stem)) return null;
+
+            foreach (var suffix in NormalSuffixes)
+            {
+                foreach (var ext in NormalExts)
+                {
+                    string file = stem + suffix + ext;
+                    string rel = string.IsNullOrEmpty(dir) ? file : Path.Combine(dir, file);
+                    if (!textureBytes.TryGetValue(rel, out var bytes))
+                        textureBytes.TryGetValue(file, out bytes);
+                    if (bytes == null) continue;
+
+                    var tex = new Texture2D(2, 2, TextureFormat.RGBA32, true, true);
+                    if (!tex.LoadImage(bytes, true))
+                    {
+                        UnityEngine.Object.Destroy(tex);
+                        continue;
+                    }
+                    int cap = Mathf.Min(maxTexSize, 1024);
+                    if ((tex.width > cap || tex.height > cap) && cap >= 128)
+                        tex = Downscale(tex, cap, linear: true);
+                    tex.filterMode = FilterMode.Trilinear;
+                    tex.anisoLevel = 4;
+                    tex.name = file;
+                    tex.hideFlags = HideFlags.DontUnloadUnusedAsset;
+                    return tex;
+                }
+            }
+            return null;
+        }
+
+        private static Texture2D GenerateMicroNormalMap(Texture2D diffuse, SurfaceKind kind, int maxTexSize)
+        {
+            int cap = Mathf.Clamp(Mathf.Min(maxTexSize, 512), 64, 512);
+            float k = Mathf.Min(1f, Mathf.Min(cap / (float)diffuse.width, cap / (float)diffuse.height));
+            int w = Mathf.Max(4, Mathf.RoundToInt(diffuse.width * k));
+            int h = Mathf.Max(4, Mathf.RoundToInt(diffuse.height * k));
+
+            var rt = RenderTexture.GetTemporary(w, h, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+            var prev = RenderTexture.active;
+            Texture2D readable = null;
+            try
+            {
+                Graphics.Blit(diffuse, rt);
+                readable = new Texture2D(w, h, TextureFormat.RGBA32, false, false);
+                RenderTexture.active = rt;
+                readable.ReadPixels(new Rect(0, 0, w, h), 0, 0);
+                var src = readable.GetPixels32();
+
+                var lum = new float[w * h];
+                for (int i = 0; i < src.Length; i++)
+                    lum[i] = (src[i].r * 0.299f + src[i].g * 0.587f + src[i].b * 0.114f) * (1f / 255f);
+
+                float gradStrength = kind == SurfaceKind.Skin ? 0.55f : 1.65f;
+                var outPx = new Color32[w * h];
+                for (int y = 0; y < h; y++)
+                {
+                    int ym = y > 0 ? y - 1 : 0;
+                    int yp = y < h - 1 ? y + 1 : h - 1;
+                    int row = y * w;
+                    for (int x = 0; x < w; x++)
+                    {
+                        int xm = x > 0 ? x - 1 : 0;
+                        int xp = x < w - 1 ? x + 1 : w - 1;
+
+                        float tl = lum[ym * w + xm], t = lum[ym * w + x], tr = lum[ym * w + xp];
+                        float l = lum[row + xm], r = lum[row + xp];
+                        float bl = lum[yp * w + xm], b = lum[yp * w + x], br = lum[yp * w + xp];
+
+                        float dx = (tr + 2f * r + br) - (tl + 2f * l + bl);
+                        float dy = (bl + 2f * b + br) - (tl + 2f * t + tr);
+
+                        float mx = 0f, my = 0f;
+                        switch (kind)
+                        {
+                            case SurfaceKind.Cloth:
+                                mx = Mathf.Sin(x * 1.570796f) * 0.10f;
+                                my = Mathf.Sin(y * 1.570796f) * 0.10f;
+                                break;
+                            case SurfaceKind.Leather:
+                                float h1 = Mathf.Sin(x * 0.73f + y * 1.31f);
+                                float h2 = Mathf.Cos(x * 1.47f - y * 0.89f);
+                                mx = h1 * 0.12f;
+                                my = h2 * 0.12f;
+                                break;
+                            case SurfaceKind.Hair:
+                                mx = Mathf.Sin(x * 1.25f) * 0.14f;
+                                my = 0f;
+                                break;
+                            case SurfaceKind.Metal:
+                                mx = 0f;
+                                my = Mathf.Sin(y * 1.7f) * 0.08f;
+                                break;
+                        }
+
+                        float nx = -(dx * gradStrength + mx);
+                        float ny = -(dy * gradStrength + my);
+                        float nz = 1f;
+                        float invLen = 1f / Mathf.Sqrt(nx * nx + ny * ny + nz * nz);
+                        nx *= invLen; ny *= invLen; nz *= invLen;
+
+                        outPx[row + x] = new Color32(
+                            (byte)Mathf.Clamp(Mathf.RoundToInt((nx * 0.5f + 0.5f) * 255f), 0, 255),
+                            (byte)Mathf.Clamp(Mathf.RoundToInt((ny * 0.5f + 0.5f) * 255f), 0, 255),
+                            (byte)Mathf.Clamp(Mathf.RoundToInt((nz * 0.5f + 0.5f) * 255f), 0, 255),
+                            255);
+                    }
+                }
+
+                var nrm = new Texture2D(w, h, TextureFormat.RGBA32, true, true)
+                {
+                    name = diffuse.name + "_microNrm",
+                    filterMode = FilterMode.Trilinear,
+                    anisoLevel = 4,
+                    hideFlags = HideFlags.DontUnloadUnusedAsset
+                };
+                nrm.SetPixels32(outPx);
+                nrm.Apply(true, true);
+                return nrm;
+            }
+            catch
+            {
+                return null;
+            }
+            finally
+            {
+                if (readable != null) UnityEngine.Object.Destroy(readable);
+                RenderTexture.active = prev;
+                RenderTexture.ReleaseTemporary(rt);
+            }
+        }
 
         private static Texture2D LoadTexture(string relPath, Dictionary<string, byte[]> textureBytes, int maxTexSize)
         {
@@ -1043,6 +1282,8 @@ namespace DollFrame
                 }
                 if ((tex.width > maxTexSize || tex.height > maxTexSize) && maxTexSize >= 128)
                     tex = Downscale(tex, maxTexSize);
+                tex.filterMode = FilterMode.Trilinear;
+                tex.anisoLevel = 8;
                 tex.name = baseName;
                 tex.hideFlags = HideFlags.DontUnloadUnusedAsset;
                 return tex;
@@ -1054,26 +1295,53 @@ namespace DollFrame
             }
         }
 
-        private static Texture2D Downscale(Texture2D src, int maxSize)
+        private static Texture2D Downscale(Texture2D src, int maxSize, bool linear = false)
         {
             float k = Mathf.Min(1f, Mathf.Min(maxSize / (float)src.width, maxSize / (float)src.height));
             int w = Mathf.Max(1, Mathf.RoundToInt(src.width * k));
             int h = Mathf.Max(1, Mathf.RoundToInt(src.height * k));
-            var rt = RenderTexture.GetTemporary(w, h, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+            var rw = linear ? RenderTextureReadWrite.Linear : RenderTextureReadWrite.sRGB;
             var prev = RenderTexture.active;
+            RenderTexture curRt = null;
+            Texture curSrc = src;
+            int cw = src.width, ch = src.height;
             try
             {
-                Graphics.Blit(src, rt);
-                var dst = new Texture2D(w, h, TextureFormat.RGBA32, true, false);
-                RenderTexture.active = rt;
-                dst.ReadPixels(new Rect(0, 0, w, h), 0, 0);
-                dst.Apply(false, true);
-                return dst;
+                while (cw > w * 2 || ch > h * 2)
+                {
+                    int nw = Mathf.Max(w, cw / 2);
+                    int nh = Mathf.Max(h, ch / 2);
+                    var stepRt = RenderTexture.GetTemporary(nw, nh, 0, RenderTextureFormat.ARGB32, rw);
+                    Graphics.Blit(curSrc, stepRt);
+                    if (curRt != null) RenderTexture.ReleaseTemporary(curRt);
+                    curRt = stepRt;
+                    curSrc = stepRt;
+                    cw = nw;
+                    ch = nh;
+                }
+                var rt = RenderTexture.GetTemporary(w, h, 0, RenderTextureFormat.ARGB32, rw);
+                try
+                {
+                    Graphics.Blit(curSrc, rt);
+                    var dst = new Texture2D(w, h, TextureFormat.RGBA32, true, linear)
+                    {
+                        filterMode = FilterMode.Trilinear,
+                        anisoLevel = 8
+                    };
+                    RenderTexture.active = rt;
+                    dst.ReadPixels(new Rect(0, 0, w, h), 0, 0);
+                    dst.Apply(true, true);
+                    return dst;
+                }
+                finally
+                {
+                    RenderTexture.ReleaseTemporary(rt);
+                }
             }
             finally
             {
+                if (curRt != null) RenderTexture.ReleaseTemporary(curRt);
                 RenderTexture.active = prev;
-                RenderTexture.ReleaseTemporary(rt);
                 if (src != null) UnityEngine.Object.Destroy(src);
             }
         }

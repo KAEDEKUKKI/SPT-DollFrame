@@ -395,6 +395,7 @@ namespace DollFrame
             smr.shadowCastingMode = ShadowCastingMode.On;
             smr.receiveShadows = true;
             smr.updateWhenOffscreen = true;
+            smr.quality = SkinQuality.Bone4;
             rig.Skin = smr;
 
             if (assets.HeadMesh != null && assets.HeadSkinBones != null && assets.HeadSkinBones.Length > 0)
@@ -424,6 +425,7 @@ namespace DollFrame
                 headSmr.shadowCastingMode = ShadowCastingMode.On;
                 headSmr.receiveShadows = true;
                 headSmr.updateWhenOffscreen = true;
+                headSmr.quality = SkinQuality.Bone4;
                 rig.HeadSkin = headSmr;
             }
 

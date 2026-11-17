@@ -1,5 +1,18 @@
 # DollFrame 變更紀錄（Changelog）
 
+## 0.4.1（2026-11-18 補強：角色建模質感、微表面法線與光影校準）
+
+* **材質與高光去塑料化（`PmxRuntime.cs`、`ShaderManager.cs`）**：
+  * 校準 `ClassifyMaterial` 與 `ClassifyStylizedLook`：降低臉部（`0.15`）、皮膚（`0.18`）與霧面布料（`0.14`）之 `Smoothness` 與白色 `SheenIntensity`，改用暖色收斂的皮膚邊緣光（`0.26`／`4.0`），並提高 `_RimAmbientAdapt` 至 `0.90`。
+  * 新增伴隨法線貼圖自動偵測（`_n`／`_normal`／`_bump`／`_nrm`，Linear 空間）與程序化微表面法線合成（`GenerateMicroNormalMap`，依布料編織／皮革顆粒／髮絲／金屬拉絲生成輕量 Tangent-Space `_BumpMap` 并納入 `PmxAssets.Textures` LRU 生命週期；臉部／眼睛／睫毛保持平滑）。
+* **雙面網格法線與蒙皮／貼圖過濾（`PmxRuntime.cs`、`CharacterRig.cs`）**：
+  * `BuildUnityMesh` 針對 `DoubleSided` 子網格拆出背面頂點並翻轉法線（`-normal`），修正頭髮、裙襬、緞帶正反面受光錯亂。
+  * `LoadTexture`／`Downscale` 啟用 `FilterMode.Trilinear`、`anisoLevel = 8` 與漸進 2x 降採樣（`Apply(true, true)` 補齊 Mipmap）。
+  * `CharacterRig` 強制 `Body_SMR` 與 `Head_SMR` 使用 `SkinQuality.Bone4`。
+* **臉部 SDF Mipmap 與環境光耦合（`SdfFaceShading.cs`）**：
+  * `BuildCloneTexture` 啟用 Mipmap、`Trilinear` 與 `anisoLevel = 4`；`SdfFaceDriver.Update` 加入光向 `Slerp` 平滑與環境亮度自適應陰影深度（`0.14–0.28`），減少暗處雙重壓黑與光向跳動。
+* **驗證**：`dotnet build -c Release -p:CopyOutputToBepInEx=false` 0 警告 0 錯誤。
+
 ## 0.4.1（2026-11-16：全模組優化、裝備/武器隱藏修復、IK/語音優化與三語系文件）
 
 * **全模組生命週期、記憶體洩漏與邊界防護**：

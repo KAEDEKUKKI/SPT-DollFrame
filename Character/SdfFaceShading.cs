@@ -47,7 +47,9 @@ namespace DollFrame
         private readonly int[] _sdfRowOf, _sdfColOf;
         private bool _primed;
         private float _lastPsi;
+        private float _lastDepth;
         private float _lastUpdate;
+        private Vector3 _smoothDir;
 
         private static readonly Vector3[] ProbeDirs =
         {
@@ -105,14 +107,16 @@ namespace DollFrame
 
         private static Texture2D BuildCloneTexture(SdfFaceAsset a)
         {
-            var tex = new Texture2D(a.CloneW, a.CloneH, TextureFormat.RGBA32, false, false)
+            var tex = new Texture2D(a.CloneW, a.CloneH, TextureFormat.RGBA32, true, false)
             {
                 name = "DollFrame_sdf_face",
                 wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Trilinear,
+                anisoLevel = 4,
                 hideFlags = HideFlags.DontUnloadUnusedAsset
             };
             tex.SetPixels32(a.Base);
-            tex.Apply(false, false);
+            tex.Apply(true, false);
             return tex;
         }
 
@@ -122,22 +126,40 @@ namespace DollFrame
             if (_a == null || !_a.HasData || _tex == null || _headT == null) return;
 
             float now = Time.unscaledTime;
-            if (_primed && now - _lastUpdate < 0.083f) return;
+            float dt = _primed ? Mathf.Max(0f, now - _lastUpdate) : 0.083f;
+            if (_primed && dt < 0.05f) return;
 
-            Vector3 probeL = SampleProbeDominantDir(_headT.position);
+            Vector3 probeL = SampleProbeDominantDir(_headT.position, out float probeLum);
             var sun = RenderSettings.sun;
-            Vector3 L = sun != null && sun.intensity > 0.05f
-                ? Vector3.Lerp(probeL, -sun.transform.forward, Mathf.Clamp01(sun.intensity)).normalized
+            float sunWeight = sun != null && sun.intensity > 0.05f ? Mathf.Clamp01(sun.intensity) : 0f;
+            Vector3 targetL = sunWeight > 0f
+                ? Vector3.Lerp(probeL, -sun.transform.forward, sunWeight)
                 : probeL;
+            if (targetL.sqrMagnitude < 1e-5f)
+                targetL = _headT.TransformDirection(_fallbackModelDir);
+            else
+                targetL.Normalize();
+
+            if (!_primed || _smoothDir.sqrMagnitude < 1e-5f)
+                _smoothDir = targetL;
+            else
+            {
+                float alpha = 1f - Mathf.Exp(-10f * Mathf.Min(dt, 0.25f));
+                _smoothDir = Vector3.Slerp(_smoothDir, targetL, alpha);
+                if (_smoothDir.sqrMagnitude > 1e-5f) _smoothDir.Normalize();
+            }
+
+            float envLum = Mathf.Clamp01(probeLum * 0.65f + sunWeight * 0.55f);
+            float shadowDepth = Mathf.Lerp(0.14f, 0.28f, envLum);
 
             var Fw = _headT.TransformDirection(_a.FaceF);
             var Rw = _headT.TransformDirection(_a.FaceR);
-            float psi = Mathf.Atan2(Vector3.Dot(L, Rw), Vector3.Dot(L, Fw));
+            float psi = Mathf.Atan2(Vector3.Dot(_smoothDir, Rw), Vector3.Dot(_smoothDir, Fw));
 
             if (_primed)
             {
                 float d = Mathf.Abs(WrapPi(psi - _lastPsi));
-                if (d < 0.035f)
+                if (d < 0.025f && Mathf.Abs(shadowDepth - _lastDepth) < 0.03f)
                 {
                     _lastUpdate = now;
                     return;
@@ -145,27 +167,31 @@ namespace DollFrame
             }
             _primed = true;
             _lastPsi = psi;
+            _lastDepth = shadowDepth;
             _lastUpdate = now;
-            Composite(psi);
+            Composite(psi, shadowDepth);
         }
 
-        private Vector3 SampleProbeDominantDir(Vector3 worldPos)
+        private Vector3 SampleProbeDominantDir(Vector3 worldPos, out float avgLum)
         {
             LightProbes.GetInterpolatedProbe(worldPos, null, out var sh);
             sh.Evaluate(ProbeDirs, _probeCols);
             Vector3 acc = Vector3.zero;
+            float totalLum = 0f;
             for (int k = 0; k < 6; k++)
             {
                 var c = _probeCols[k];
-                float lum = c.r * 0.299f + c.g * 0.587f + c.b * 0.114f;
-                acc += ProbeDirs[k] * Mathf.Max(0f, lum);
+                float lum = Mathf.Max(0f, c.r * 0.299f + c.g * 0.587f + c.b * 0.114f);
+                totalLum += lum;
+                acc += ProbeDirs[k] * lum;
             }
+            avgLum = totalLum / 6f;
             return acc.sqrMagnitude > 1e-4f
                 ? acc.normalized
                 : _headT.TransformDirection(_fallbackModelDir);
         }
 
-        private void Composite(float psi)
+        private void Composite(float psi, float shadowDepth)
         {
             float w = SdfFaceAsset.BoundaryRad;
             float outer = Mathf.PI / 2f + w;
@@ -176,6 +202,12 @@ namespace DollFrame
                 float f = Mathf.Clamp01((outer - dist) / (2f * w));
                 _lut[k] = (byte)Mathf.RoundToInt(f * 255f);
             }
+            float minR = 1f - shadowDepth * 0.72f;
+            float minG = 1f - shadowDepth * 0.96f;
+            float minB = 1f - shadowDepth * 1.05f;
+            float spanR = 1f - minR;
+            float spanG = 1f - minG;
+            float spanB = 1f - minB;
             int rc = 0;
             int sdfW = _a.SdfW;
             for (int y = 0; y < _rh; y++)
@@ -190,10 +222,10 @@ namespace DollFrame
                     if (_a.Cover[si])
                     {
                         float f = _lut[_a.Theta[si]] / 255f;
-                        // 皮膚陰影下限＋暖色衰減（避免 0.0 純黑塊造成臉部發黑不自然）
-                        float fr = 0.76f + 0.24f * f;
-                        float fg = 0.68f + 0.32f * f;
-                        float fb = 0.65f + 0.35f * f;
+                        // 皮膚陰影下限＋暖色衰減（依環境亮度自適應，避免暗處雙重壓黑）
+                        float fr = minR + spanR * f;
+                        float fg = minG + spanG * f;
+                        float fb = minB + spanB * f;
                         _rect[rc++] = new Color32(
                             (byte)Mathf.RoundToInt(b.r * fr),
                             (byte)Mathf.RoundToInt(b.g * fg),
@@ -207,7 +239,7 @@ namespace DollFrame
                 }
             }
             _tex.SetPixels32(_rx, _ry, _rw, _rh, _rect);
-            _tex.Apply(false, false);
+            _tex.Apply(true, false);
         }
 
         internal void Terminate()
