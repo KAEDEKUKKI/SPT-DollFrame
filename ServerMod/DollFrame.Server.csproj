@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>DollFrame.Server</AssemblyName>
-    <Version>0.4.1</Version>
+    <Version>0.4.2</Version>
     <Description>SPT-DollFrame character and voice replacement framework companion.</Description>
     <RootNamespace>DollFrame.Server</RootNamespace>
   </PropertyGroup>

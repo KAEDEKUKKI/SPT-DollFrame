@@ -1,5 +1,23 @@
 # DollFrame 變更紀錄（Changelog）
 
+## 0.4.2（2026-11-19：次要物理防穿模、體態自動擬合與性能優化）
+
+* **線段對膠囊碰撞與防穿模強化（`SpringPhysics.cs`、`CharacterRig.cs`）**：
+  * 靜止重疊區不再將 `ColliderRadii` 歸零，保留至少 `4mm` 核心碰撞半徑防止大動作穿過骨骼軸心；雙點採樣升級為線段對線段最近點推離（`ClosestPointsSegmentSegment` + `ProjectConstraints`）。
+  * 裙擺同圈相鄰平滑迴圈後補做膠囊碰撞與距離投影，避免相鄰裙片互相牽引時被拉回腿部／骨盆膠囊內。
+  * 末端葉骨改依實際蒙皮頂點（`ComputeLeafVertexExtents`）推算延伸長度，並補齊左右手部膠囊（`左手首`→`左中指１`、`右手首`→`右中指１`）。
+  * 為側髮（相對頭骨）啟用非對稱外擴圓錐，並於 `ProjectConstraints` 加入地面高度夾緊（`minWorldY`），防止低蹲或趴下時長髮與長裙沉入地面。
+* **依附主骨表面切平面與體態自動擬合（`SpringPhysics.cs`）**：
+  * 為 `Accessory` 與 `Breast` 沿骨架樹追溯第一個非物理主骨架骨（`AnchorBone`），依靜止姿態建立隨依附骨旋轉的外法線與表面防穿切平面（`HasSurfacePlane`），防止領帶、緞帶、袖飾與胸部穿入軀幹或手臂。
+  * 新增 `FitBodyCapsuleRadii`：排除含物理骨權重（`> 0.1`）的外層衣物／頭髮頂點，取各身體膠囊對應主骨頂點垂直距離第 45 百分位自動擬合半徑（夾緊於預設 `0.75x ~ 1.40x`）。
+* **胸部物理美觀調校（`SpringPhysics.cs`）**：
+  * `SpringCategory.Breast` 調整為 `Stiffness = 115f`、`Drag = 18.5f`、`GravityScale = 0.10f`、`MaxAngleDeg = 9f`、`Radius = 0.012f`（搭配 `MaxInwardDeg = 3f` 與 `3mm` 表面切平面容差），減少浮動餘震與內塌。
+* **性能優化（`SpringPhysics.cs`、`CharacterRig.cs`）**：
+  * 依部位（`CapsuleRegion`）與靜止距離為每個節點建立 32-bit `ColliderMask` 預篩遮罩，跳過無關或過遠的膠囊檢測。
+  * 第一人稱視角（`InFirstPerson`，僅限本地玩家 `IsYourPlayer`）下跳過不可見的 `IsHair` 物理計算與 `SdfFace.Update()`。
+  * 整層深度解算完畢後才批次寫入 `localRotation`，減少 Unity Transform 矩陣重算；待機微動狀態（`pivotDistSq < 1e-6f && v² < 1e-4f`）自動降為單子步。
+* **驗證**：`dotnet build -c Release`（主程式 + `ServerMod`）0 警告 0 錯誤。
+
 ## 0.4.1（2026-11-18 補強：角色建模質感、微表面法線與光影校準）
 
 * **材質與高光去塑料化（`PmxRuntime.cs`、`ShaderManager.cs`）**：
@@ -11,7 +29,11 @@
   * `CharacterRig` 強制 `Body_SMR` 與 `Head_SMR` 使用 `SkinQuality.Bone4`。
 * **臉部 SDF Mipmap 與環境光耦合（`SdfFaceShading.cs`）**：
   * `BuildCloneTexture` 啟用 Mipmap、`Trilinear` 與 `anisoLevel = 4`；`SdfFaceDriver.Update` 加入光向 `Slerp` 平滑與環境亮度自適應陰影深度（`0.14–0.28`），減少暗處雙重壓黑與光向跳動。
-* **驗證**：`dotnet build -c Release -p:CopyOutputToBepInEx=false` 0 警告 0 錯誤。
+* **次要物理零凸起防穿模強化（`SpringPhysics.cs`）**：
+  * 移除裙擺 `0.50f` 強制碰撞半徑下限，並為末端（`t=1.0`）與中點（`t=0.5`）各自校準靜止貼合有效半徑（靜止本就重疊之採樣點設為 `0` 跳過），確保站立零凸起。
+  * 為裙擺加入「非對稱內縮角度限制」（向外維持 `50°` 自由擺動、向骨盆中心內側緊縮至 `8°`）與「同圈相鄰平滑約束」（同深度依方位角串聯，限制單片孤立鼓包）。
+  * `StepNode` 改為「膠囊碰撞 ↔ 硬距離投影」2 輪交替求解，並在碰撞後消除朝向膠囊內部的法向速度、保留切向滑動，加上急轉／蹲趴樞紐位移慣性限幅，使布料與頭髮擺動時順著身體表面貼合滑動而不穿模。
+* **驗證**：`dotnet build -c Release` 0 警告 0 錯誤。
 
 ## 0.4.1（2026-11-16：全模組優化、裝備/武器隱藏修復、IK/語音優化與三語系文件）
 

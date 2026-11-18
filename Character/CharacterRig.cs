@@ -493,7 +493,7 @@ namespace DollFrame
             var alreadyDriven = new bool[bones.Length];
             for (int i = 0; i < bones.Length; i++)
                 alreadyDriven[i] = rig._entryOf[i] != null || rig._grantParent[i] >= 0;
-            rig._springPhysics = SpringPhysicsRig.Build(root, rig.Bones, bones, alreadyDriven);
+            rig._springPhysics = SpringPhysicsRig.Build(root, rig.Bones, bones, alreadyDriven, pmx);
             {
                 float charY = 0f;
                 int charN = 0;
@@ -755,7 +755,7 @@ namespace DollFrame
 
                 EvaluateBonePlan(paritySampling, parityLine);
                 EmitIkTargetLine();
-                _springPhysics?.StepAndApply(Time.deltaTime, Time.frameCount, Plugin.SecondaryPhysics == null || Plugin.SecondaryPhysics.Value);
+                _springPhysics?.StepAndApply(Time.deltaTime, Time.frameCount, Plugin.SecondaryPhysics == null || Plugin.SecondaryPhysics.Value, InFirstPerson);
 
                 if (paritySampling)
                 {
@@ -829,7 +829,7 @@ namespace DollFrame
 
         internal void UpdateSdfFace()
         {
-            if (SdfFace != null) SdfFace.Update();
+            if (SdfFace != null && !InFirstPerson) SdfFace.Update();
         }
 
         internal void TerminateSdf()
