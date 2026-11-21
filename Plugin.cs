@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Logging;
@@ -17,7 +18,7 @@ namespace DollFrame
     /// Scales the vanilla Tarkov player skeleton at player-body init so imported
     /// (unchanged) models fit; compensates the movement capsule; refreshes IK.
     /// </summary>
-    [BepInPlugin("DollFrame", "DollFrame", "0.4.1")]
+    [BepInPlugin("DollFrame", "DollFrame", "0.4.3")]
     public class Plugin : BaseUnityPlugin
     {
         internal static Plugin Instance;
@@ -49,6 +50,7 @@ namespace DollFrame
         internal static ConfigEntry<bool> HideEyewear;
         internal static ConfigEntry<bool> HideEarpiece;
         internal static ConfigEntry<bool> HideArmBand;
+        internal static ConfigEntry<bool> SyncMultiplayer;
 
         private sealed class ConfigurationManagerAttributes
         {
@@ -96,12 +98,22 @@ namespace DollFrame
             {
                 if (!ReplaceBody.Value)
                 {
-                    foreach (var br in UnityEngine.Object.FindObjectsOfType<BodyReplacer>())
+                    foreach (var p in Resources.FindObjectsOfTypeAll<Player>())
                     {
-                        if (br != null) UnityEngine.Object.DestroyImmediate(br);
+                        if (p != null && p.gameObject.scene.isLoaded && p.IsYourPlayer)
+                            BodyReplacer.Reapply(p);
                     }
                     PreviewProxyDriver.NotifyAllCharacterChanged();
                 }
+                else
+                {
+                    foreach (var p in Resources.FindObjectsOfTypeAll<Player>())
+                    {
+                        if (p != null && p.gameObject.scene.isLoaded && p.IsYourPlayer)
+                            BodyReplacer.Reapply(p);
+                    }
+                }
+                TryBroadcastLocalAppearance();
             };
             ReplaceVoice = Config.Bind("Visual", "Replace player voice", true,
                 "選擇角色建模時自動替換玩家語音（Voices/<角色家族>/）；切回 Vanilla (PMC) 時還原原版語音。");
@@ -139,6 +151,13 @@ namespace DollFrame
             HideArmBand = Config.Bind("Equipment", "Hide armband on replaced bodies", true,
                 "Same as hide-armor, for the armband slot.");
 
+            SyncMultiplayer = Config.Bind("Multiplayer", "Sync teammate models and voices", true,
+                "在 Fika 多人連線中同步並顯示隊友選擇的 DollFrame 角色建模與語音（需本機也安裝對應角色包／語音包）。");
+            SyncMultiplayer.SettingChanged += (_, __) => Multiplayer.MultiplayerRegistry.ReapplyAllRemote();
+
+            if (BepInEx.Bootstrap.Chainloader.PluginInfos.ContainsKey("com.fika.core"))
+                InitFikaBridge();
+
             // Each container is patched independently so one failure can't silently abort
             // the rest of Awake (Unity log isn't captured to LogOutput.log in this setup).
             var harmony = new Harmony("DollFrame");
@@ -168,6 +187,7 @@ namespace DollFrame
                         BodyReplacer.Reapply(p);
                     }
                 }
+                TryBroadcastLocalAppearance();
             }
             catch (Exception e)
             {
@@ -233,11 +253,14 @@ namespace DollFrame
         internal static string[] MenuPackageNames() => DiscoverPackages();
 
         /// <summary>Full character folder path for the selected character, or null when unset/missing/vanilla.</summary>
-        internal static string ResolvePackagePath()
+        internal static string ResolvePackagePath() => ResolvePackagePath(Character?.Value);
+
+        /// <summary>Full character folder path for an explicit character name, or null when unset/missing/vanilla.</summary>
+        internal static string ResolvePackagePath(string characterName)
         {
-            var choice = Character?.Value;
-            if (VanillaSelection.IsVanilla(choice)) return null;
-            var name = Path.GetFileName(choice);
+            if (VanillaSelection.IsVanilla(characterName)) return null;
+            var name = Path.GetFileName(characterName);
+            if (string.IsNullOrEmpty(name)) return null;
             foreach (var dir in GetCharacterDirectories())
             {
                 var charDir = Path.Combine(dir, name);
@@ -245,6 +268,23 @@ namespace DollFrame
                     return charDir;
             }
             return null;
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void InitFikaBridge()
+        {
+#if HAS_FIKA
+            Multiplayer.FikaBridge.Initialize();
+#endif
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void TryBroadcastLocalAppearance()
+        {
+#if HAS_FIKA
+            if (BepInEx.Bootstrap.Chainloader.PluginInfos.ContainsKey("com.fika.core"))
+                Multiplayer.FikaBridge.BroadcastLocalAppearance();
+#endif
         }
 
         private static void TryPatch(Harmony harmony, System.Type container)

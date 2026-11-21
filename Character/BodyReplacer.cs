@@ -73,7 +73,8 @@ namespace DollFrame
         {
             if (player == null) return;
             var existing = player.gameObject.GetComponent<BodyReplacer>();
-            if (!Plugin.ReplaceBody.Value || VanillaSelection.IsVanilla(Plugin.Character?.Value))
+            var targetChar = Multiplayer.MultiplayerRegistry.ResolveCharacterForPlayer(player);
+            if (string.IsNullOrEmpty(targetChar))
             {
                 ReleaseAndDestroy(existing, suppressRestore: false);
                 Apply(player);
@@ -84,31 +85,33 @@ namespace DollFrame
             if (player.gameObject.GetComponent<BodyReplacer>() == null)
             {
                 VanillaBodyHider.RestoreAllVanilla(player);
-                CapsulePatches.ApplyScale(player, 1f);
+                if (player.IsYourPlayer) CapsulePatches.ApplyScale(player, 1f);
                 VoiceReplacer.Restore(player);
             }
         }
 
         internal static void Apply(Player player)
         {
-            if (player == null || !Plugin.ReplaceBody.Value) return;
-            if (!Patches.ShouldScale(player)) return;
+            if (player == null) return;
 
             var existing = player.gameObject.GetComponent<BodyReplacer>();
-            if (VanillaSelection.IsVanilla(Plugin.Character?.Value))
+            var targetChar = Multiplayer.MultiplayerRegistry.ResolveCharacterForPlayer(player);
+            if (string.IsNullOrEmpty(targetChar))
             {
-                ReleaseAndDestroy(existing);
-                VanillaBodyHider.RestoreAllVanilla(player);
-                CapsulePatches.ApplyScale(player, 1f);
-                VoiceReplacer.Restore(player);
+                if (existing != null)
+                {
+                    ReleaseAndDestroy(existing);
+                    VanillaBodyHider.RestoreAllVanilla(player);
+                    if (player.IsYourPlayer) CapsulePatches.ApplyScale(player, 1f);
+                    VoiceReplacer.Restore(player);
+                }
                 return;
             }
 
             var reinit = false;
             if (existing != null)
             {
-                var cur = Path.GetFileName(Plugin.Character?.Value);
-                if (string.IsNullOrEmpty(cur) || existing._pkgName == cur)
+                if (existing._pkgName == targetChar)
                 {
                     var newRoot = player.PlayerBones != null ? player.PlayerBones.RootJoint : null;
                     if (newRoot != null && existing._rootJoint != null && existing._rootJoint != newRoot)
@@ -132,13 +135,20 @@ namespace DollFrame
                 }
             }
 
-            string packagePath = Plugin.ResolvePackagePath();
+            string packagePath = Plugin.ResolvePackagePath(targetChar);
             if (string.IsNullOrEmpty(packagePath))
             {
-                if (!_missingLogged)
+                if (player.IsYourPlayer)
                 {
-                    _missingLogged = true;
-                    Plugin.Log.LogWarning($"[DollFrame] character package missing for '{Plugin.Character.Value}' in '{Plugin.CharactersDirectory}' (place PMX character folders here)");
+                    if (!_missingLogged)
+                    {
+                        _missingLogged = true;
+                        Plugin.Log.LogWarning($"[DollFrame] character package missing for '{targetChar}' in '{Plugin.CharactersDirectory}' (place PMX character folders here)");
+                    }
+                }
+                else
+                {
+                    Multiplayer.MultiplayerRegistry.WarnMissingRemotePackageOnce(targetChar, player.Profile?.Nickname);
                 }
                 return;
             }
@@ -199,7 +209,8 @@ namespace DollFrame
                 if (warm && attachMs > 16.0)
                     Plugin.Log.LogWarning($"[DollFrame] warn: attach exceeded frame budget ({attachMs:0.##}ms)");
 
-                CapsulePatches.ApplyDerived(player, scaledHeightM);
+                if (player.IsYourPlayer)
+                    CapsulePatches.ApplyDerived(player, scaledHeightM);
 
                 var comp = player.gameObject.AddComponent<BodyReplacer>();
                 comp._player = player;
@@ -218,9 +229,10 @@ namespace DollFrame
                 {
                     try
                     {
-                        if (player == null || !player.IsYourPlayer || player.PlayerBody == null) return (false, true);
-                        bool fp = player.PlayerBody.PointOfView.Value.IsFirstPerson();
+                        if (player == null) return (false, true);
                         bool alive = player.HealthController == null || player.HealthController.IsAlive;
+                        if (!player.IsYourPlayer || player.PlayerBody == null) return (false, alive);
+                        bool fp = player.PlayerBody.PointOfView.Value.IsFirstPerson();
                         return (fp, alive);
                     }
                     catch { return (false, true); }
@@ -257,30 +269,23 @@ namespace DollFrame
         private void LateUpdate()
         {
             if (_player == null) return;
-            if (!Plugin.ReplaceBody.Value)
-            {
-                ReleaseAndDestroy(this, suppressRestore: false);
-                return;
-            }
 
             try
             {
-                if (_player.IsYourPlayer)
+                var targetChar = Multiplayer.MultiplayerRegistry.ResolveCharacterForPlayer(_player);
+                if (string.IsNullOrEmpty(targetChar))
                 {
-                    var cur = Path.GetFileName(Plugin.Character?.Value);
-                    if (VanillaSelection.IsVanilla(Plugin.Character?.Value))
-                    {
-                        Plugin.Log.LogInfo($"[DollFrame] live character switch to Vanilla (PMC)");
-                        Reapply(_player);
-                        return;
-                    }
-                    if (!string.IsNullOrEmpty(cur) && cur != _pkgName)
-                    {
-                        var p = _player;
-                        Plugin.Log.LogInfo($"[DollFrame] live character switch on player: '{_pkgName}' -> '{cur}'");
-                        Reapply(p);
-                        return;
-                    }
+                    if (_player.IsYourPlayer)
+                        Plugin.Log.LogInfo("[DollFrame] live character switch to Vanilla (PMC)");
+                    Reapply(_player);
+                    return;
+                }
+                if (targetChar != _pkgName)
+                {
+                    var p = _player;
+                    Plugin.Log.LogInfo($"[DollFrame] live character switch on '{p.Profile?.Nickname}': '{_pkgName}' -> '{targetChar}'");
+                    Reapply(p);
+                    return;
                 }
 
                 // POV 查詢提早取值一次（臂鏈 IK 狀態閘：Drive 前寫入 alive∧armed；死亡/布娃娃或
@@ -399,7 +404,7 @@ namespace DollFrame
 
         private void OnCameraPreCull(UnityEngine.Camera cam)
         {
-            if (_player == null || _rig == null || !Plugin.ReplaceBody.Value) return;
+            if (_player == null || _rig == null) return;
             int frame = Time.frameCount;
             if (_lastPreCullFrame == frame) return;
             _lastPreCullFrame = frame;
@@ -431,7 +436,8 @@ namespace DollFrame
                     if (_player != null)
                     {
                         try { VanillaBodyHider.RestoreAllVanilla(_player); } catch (Exception ex) { Plugin.Log.LogWarning($"[DollFrame] OnDestroy RestoreAllVanilla error: {ex.Message}"); }
-                        try { CapsulePatches.ApplyScale(_player, 1f); } catch (Exception ex) { Plugin.Log.LogWarning($"[DollFrame] OnDestroy CapsulePatches.ApplyScale error: {ex.Message}"); }
+                        if (_player.IsYourPlayer)
+                            try { CapsulePatches.ApplyScale(_player, 1f); } catch (Exception ex) { Plugin.Log.LogWarning($"[DollFrame] OnDestroy CapsulePatches.ApplyScale error: {ex.Message}"); }
                         try { VoiceReplacer.Restore(_player); } catch (Exception ex) { Plugin.Log.LogWarning($"[DollFrame] OnDestroy VoiceReplacer.Restore error: {ex.Message}"); }
                     }
                 }
@@ -558,8 +564,7 @@ namespace DollFrame
         [HarmonyPatch(typeof(PlayerBody), nameof(PlayerBody.UpdatePlayerRenders))]
         internal static void PostUpdatePlayerRenders(PlayerBody __instance)
         {
-            if (!Plugin.ReplaceBody.Value || __instance == null) return;
-            if (VanillaSelection.IsVanilla(Plugin.Character?.Value)) return;
+            if (__instance == null) return;
             try
             {
                 var comp = __instance.GetComponentInParent<BodyReplacer>();
@@ -572,11 +577,12 @@ namespace DollFrame
                 var player = __instance.GetComponentInParent<Player>();
                 if (player != null)
                 {
-                    if (Patches.ShouldScale(player))
+                    if (!string.IsNullOrEmpty(Multiplayer.MultiplayerRegistry.ResolveCharacterForPlayer(player)))
                         VanillaBodyHider.PreHideVanilla(player);
                     return;
                 }
 
+                if (!Plugin.ReplaceBody.Value || VanillaSelection.IsVanilla(Plugin.Character?.Value)) return;
                 var drv = __instance.GetComponentInParent<PreviewProxyDriver>() ?? PreviewProxyDriver.ActiveInstance;
                 if (drv != null)
                 {

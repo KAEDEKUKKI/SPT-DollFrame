@@ -17,8 +17,9 @@ namespace DollFrame
         [HarmonyPatch(typeof(Player), "InitVisuals")]
         internal static void PreInitVisuals(Player __instance)
         {
-            if (!Plugin.ReplaceBody.Value || !ShouldScale(__instance)) return;
-            if (VanillaSelection.IsVanilla(Plugin.Character?.Value)) return;
+            var targetChar = Multiplayer.MultiplayerRegistry.ResolveCharacterForPlayer(__instance);
+            if (string.IsNullOrEmpty(targetChar)) return;
+            if (string.IsNullOrEmpty(Plugin.ResolvePackagePath(targetChar))) return;
             try
             {
                 BodyReplacer.PreHideVanilla(__instance);

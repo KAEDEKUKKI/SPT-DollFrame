@@ -22,7 +22,7 @@
 ## 版本與平台資訊
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-0.4.1-7c4dff?style=for-the-badge" alt="Version 0.4.1" />
+  <img src="https://img.shields.io/badge/Version-0.4.3-7c4dff?style=for-the-badge" alt="Version 0.4.3" />
   <img src="https://img.shields.io/badge/Single%20Player%20Tushonka-~4.1.6-blue?style=for-the-badge" alt="Single Player Tushonka ~4.1.6" />
   <img src="https://img.shields.io/badge/Platform-BepInEx%205%20%7C%20.NET%20Standard%202.1-success?style=for-the-badge" alt="Platform" />
   <img src="https://img.shields.io/badge/License-All%20Rights%20Reserved-lightgrey?style=for-the-badge" alt="License" />
@@ -83,6 +83,52 @@
 
 3. 啟動遊戲後，在主選單進入 **角色 → 全般（Overall）** 透過 `DollFrame` 列選擇角色；若要在戰局與藏身處實際替換身體，請按 **F12** 開啟設定將 `Visual → Replace player body` 設為開啟。
 
+### 目錄架構
+
+```text
+<SPTarkov>/
+├── BepInEx/plugins/DollFrame/
+│   ├── DollFrame.dll
+│   ├── dollframe_shaders.bundle
+│   ├── Characters/                      # 或 DollFrame_Characters/（亦會自動掃描同層其他插件資料夾）
+│   │   └── <角色名稱>/
+│   │       ├── <model>.pmx              # PMX 2.0 模型檔
+│   │       ├── sdf_face.png             # 選用的臉部 SDF 烘焙貼圖
+│   │       └── Textures/                # 模型貼圖資料夾
+│   └── Voices/                          # 或 DollFrame_Voices/（亦會自動掃描同層其他插件資料夾）
+│       └── <角色家族>/
+│           ├── OnFight/*.wav            # 16-bit PCM 或 32-bit float .wav
+│           ├── NeedMedkit/*.wav
+│           └── ...                      # 依 EFT EPhraseTrigger 或 USEC/BEAR 語音庫別名命名
+└── user/mods/DollFrame/
+    └── DollFrame.Server.dll             # 選用的伺服端載入資訊模組
+```
+
+### `Characters` 骨架命名規則（PMX / MMD）
+
+DollFrame 依標準日文 MMD 骨骼名稱（`BoneContract`）對應 EFT 骨架，以下 **21 根核心骨骼**為必填項目，缺一將無法完整掛載：
+
+| 部位 | 必填骨骼名稱（PMX 日文標準名） |
+|---|---|
+| **骨盆／脊椎／頭部** | `下半身`、`上半身`、`上半身2`、`首`、`頭` *（選用根骨別名：`腰`、`センター`）* |
+| **左臂** | `左肩`、`左腕`、`左ひじ`、`左手首` |
+| **右臂** | `右肩`、`右腕`、`右ひじ`、`右手首` |
+| **左腿** | `左足`、`左ひざ`、`左足首`、`左足首先` |
+| **右腿** | `右足`、`右ひざ`、`右足首`、`右足首先` |
+
+- **選用 30 根指骨**（用於持槍握把吸附與空手自然微彎）：
+  - 拇指：`左親指０` / `１` / `２`、`右親指０` / `１` / `２`
+  - 食指：`左人指１` / `２` / `３`、`右人指１` / `２` / `３`
+  - 中指：`左中指１` / `２` / `３`、`右中指１` / `２` / `３`
+  - 無名指：`左薬指１` / `２` / `３`、`右薬指１` / `２` / `３`
+  - 小指：`左小指１` / `２` / `３`、`右小指１` / `２` / `３`
+- **次要物理與其餘骨骼**：未列於契約的末端／附屬骨骼（如頭髮、裙擺、絲帶、衣襬、胸部）將保留原父子階層，並由 `SpringPhysics` 自動接手物理擺動。
+
+### `Voices` 命名與匹配規則
+
+- **資料夾對應**：優先尋找與角色資料夾完全同名的 `Voices/<角色名稱>/`，若無則採用**最長前綴匹配**（例如 `GF2-克萊妲(濯浪焦點)` 會自動對應 `Voices/GF2-克萊妲/`）。
+- **觸發子資料夾**：以 EFT `EPhraseTrigger` 名稱命名（如 `OnFight`、`OnBeingHurt`、`NeedMedkit`、`OnEnemyDown`、`GetInCover`、`Reload`、`Greetings`），亦支援常見 USEC／BEAR 銀行別名（如 `Fight`、`BrokenHand`、`BrokenLeg`、`Cooperation`、`Attention` 等）。
+
 ---
 
 ## 設定項與預設值
@@ -130,6 +176,12 @@
 | `Hide earpiece on replaced bodies` | `true` | 隱藏耳機外觀。 |
 | `Hide armband on replaced bodies` | `true` | 隱藏臂章外觀。 |
 
+### Multiplayer（Fika 多人連線）
+
+| 設定鍵 | 預設值 | 說明 |
+|---|---|---|
+| `Sync teammate models and voices` | `true` | 在 Fika 多人連線中同步並顯示隊友選擇的 DollFrame 角色建模與語音（需本機也安裝對應角色包／語音包）。 |
+
 ---
 
 ## 角色包設定說明
@@ -156,7 +208,10 @@
 ## 技術架構
 
 ```text
-Plugin.cs                      # BepInEx 入口：26 項設定綁定、資料夾掃描、Harmony 註冊
+Plugin.cs                      # BepInEx 入口：27 項設定綁定、資料夾掃描、Harmony 註冊
+├── Multiplayer/
+│   ├── MultiplayerRegistry.cs # 無網路相依的 ProfileId → CharacterName 登錄與玩家查詢
+│   └── FikaBridge.cs          # 延遲載入的 Fika 封包同步（DollFrameAppearancePacket）與 Host 轉發
 ├── Character/
 │   ├── PmxRuntime.cs          # PMX 2.0 解析、貼圖載入與 PmxAssets LRU 快取
 │   ├── MeshSplitter.cs        # 載入期拆分頭／身網格
@@ -198,6 +253,7 @@ dotnet build ServerMod/DollFrame.Server.csproj -c Release
 ## 開發進度
 
 - [x] **v0.4.0–0.4.1**：修復藏身處穿過地板問題、全模組生命週期與記憶體洩漏優化、修復頭盔／耳機／面罩未隱藏、修復切換武器誤藏問題、抓取精度 `< 0.05 cm` 與手指吸附、自然空手垂臂姿態、語音 RMS 響度標準化與精簡設定項。
+- [x] **v0.4.2–0.4.3**：線段對膠囊次要物理防穿模與體態自動擬合，以及 Fika 多人連線隊友建模與多家族語音同步架構。
 - [ ] **後續規劃**：支援個別角色獨立語音音量／音調預設、擴充更多觸發語音別名與進階風格化著色預設。
 
 ---

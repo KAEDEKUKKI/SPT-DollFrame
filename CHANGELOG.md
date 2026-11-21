@@ -1,5 +1,26 @@
 # DollFrame 變更紀錄（Changelog）
 
+## 0.4.3（2026-11-21：Fika 多人架構重構與隊友建模／語音同步）
+
+* **多人外觀登錄與 Fika 網路同步（`Multiplayer/MultiplayerRegistry.cs`、`Multiplayer/FikaBridge.cs`）**：
+  * 新增純淨無網路相依的 `MultiplayerRegistry`（以 `ProfileId → CharacterName` 管理每位玩家的目標角色與語音家族），統一本機玩家與遠端隊友的解析入口 `ResolveCharacterForPlayer(Player)`，徹底取代原本只認 `player.IsYourPlayer` 與全域單一 `Plugin.Character` 的單機架構。
+  * 新增 `FikaBridge`（僅於 `com.fika.core` 存在時由 `Plugin.InitFikaBridge` `[MethodImpl(MethodImplOptions.NoInlining)]` 延遲載入，單機無 Fika 環境零相依）：
+    * 定義 `DollFrameAppearancePacket`（`INetSerializable`）同步 `ProfileId` 與選用角色名稱；
+    * Host（`FikaServer`）接收 Client 封包後更新本地登錄表並轉發其他 Client，並於 `PeerConnectedEvent` 時將所有已知玩家（含 Host 自身）外觀補發給新連線 Client；
+    * 處理封包早於／晚於 `ObservedPlayer` 生成的競態（`FikaPlayer.OnPlayerSpawned` 與 `SetRemoteCharacter` 雙向補套用），以及戰局結束／斷線清理（`FikaNetworkManagerDestroyedEvent` / `FikaGameEndedEvent`）；
+    * 本機切換角色或開關 `ReplaceBody` 時即時廣播給隊友。
+* **多玩家建模與生命週期隔離（`Patches.cs`、`BodyReplacer.cs`）**：
+  * `Patches.PreInitVisuals` 與 `BodyReplacer.Apply` / `Reapply` / `LateUpdate` / `PostUpdatePlayerRenders` 改以 `ResolveCharacterForPlayer(player)` 驅動，支援對遠端 `ObservedPlayer` 替換 PMX 建模、隱藏原版素體與裝備槽位，且對未同步／Vanilla 隊友與 AI 維持零寫入。
+  * 遠端隊友僅套用模型側等比縮放與第三人稱渲染（強制 `fp=false` 保留完整頭部與次要物理；不介入遠端 `CapsulePatches` 膠囊縮放與 `GroundTelemetry`）。
+  * 本機缺少隊友選用的角色包時，每個包名僅記錄一次警告並保留其原版 PMC 外觀。
+* **多家族並行語音快取與說話者匹配（`VoiceReplacer.cs`）**：
+  * 將原本單一全域 `_cachedFamily` / `_cachedClips` 改構為 `FamilyClipCache`（`Dictionary<string, Dictionary<string, AudioClip[]>>`）與 `AppliedFamilyBySpeaker`（`ConditionalWeakTable`），支援戰局內多位隊友同時使用不同角色語音包而不互相銷毀 `AudioClip`。
+  * `ApplyToSpeaker` 改用 `MultiplayerRegistry.FindPlayerBySpeaker(speaker)`，修復 `GamePlayerOwner.MyPlayer != null` 時直接返回導致遠端隊友 `BaseSpeaker.Init` 被忽略的問題。
+* **設定與版本（`Plugin.cs`、`DollFrame.csproj`）**：
+  * 新增 `[Multiplayer] Sync teammate models and voices`（`Plugin.SyncMultiplayer`，預設 `true`），支援戰局內即時開關同步所有遠端隊友外觀與語音。
+  * 版本 `0.4.2` → `0.4.3`（`DollFrame.csproj` 與 `Plugin.cs` `[BepInPlugin]` 同步）。
+* **驗證**：`dotnet build -c Release`（`DollFrame` + `DollFrame.Server`）0 警告 0 錯誤。
+
 ## 0.4.2（2026-11-19：次要物理防穿模、體態自動擬合與性能優化）
 
 * **線段對膠囊碰撞與防穿模強化（`SpringPhysics.cs`、`CharacterRig.cs`）**：

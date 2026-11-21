@@ -4,7 +4,7 @@
     <AssemblyName>DollFrame</AssemblyName>
     <RootNamespace>DollFrame</RootNamespace>
     <TargetFramework>netstandard2.1</TargetFramework>
-    <Version>0.4.2</Version>
+    <Version>0.4.3</Version>
     <Description>Modular PMX character model, IK retargeting, PBR/SDF shader, and voice replacement framework for SPTarkov.</Description>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
@@ -43,6 +43,13 @@
     <Reference Include="$(SPTTarkovDirectory)\EscapeFromTarkov_Data\Managed\Sirenix.OdinInspector.Attributes.dll"><Private>false</Private></Reference>
     <Reference Include="$(SPTTarkovDirectory)\BepInEx\core\0Harmony.dll"><Private>false</Private></Reference>
     <Reference Include="$(SPTTarkovDirectory)\BepInEx\core\BepInEx.dll"><Private>false</Private></Reference>
+  </ItemGroup>
+
+  <PropertyGroup Condition="exists('$(SPTTarkovDirectory)\BepInEx\plugins\Fika\Fika.Core.dll')">
+    <DefineConstants>$(DefineConstants);HAS_FIKA</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup Condition="exists('$(SPTTarkovDirectory)\BepInEx\plugins\Fika\Fika.Core.dll')">
+    <Reference Include="$(SPTTarkovDirectory)\BepInEx\plugins\Fika\Fika.Core.dll"><Private>false</Private></Reference>
   </ItemGroup>
 
   <Target Name="CopyOutput" AfterTargets="Build" Condition="'$(CopyOutputToBepInEx)'=='true'">

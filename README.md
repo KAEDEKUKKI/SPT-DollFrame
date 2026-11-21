@@ -22,7 +22,7 @@
 ## Badges
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-0.4.1-7c4dff?style=for-the-badge" alt="Version 0.4.1" />
+  <img src="https://img.shields.io/badge/Version-0.4.3-7c4dff?style=for-the-badge" alt="Version 0.4.3" />
   <img src="https://img.shields.io/badge/Single%20Player%20Tushonka-~4.1.6-blue?style=for-the-badge" alt="Single Player Tushonka ~4.1.6" />
   <img src="https://img.shields.io/badge/Platform-BepInEx%205%20%7C%20.NET%20Standard%202.1-success?style=for-the-badge" alt="Platform" />
   <img src="https://img.shields.io/badge/License-All%20Rights%20Reserved-lightgrey?style=for-the-badge" alt="License" />
@@ -83,6 +83,52 @@
 
 3. Launch the game, open **Character → Overall** in the main menu to pick a character using the `DollFrame` row, and enable `Visual → Replace player body` in **F12** (Configuration Manager) when you want the replacement active in raids and hideout.
 
+### Directory Structure
+
+```text
+<SPTarkov>/
+├── BepInEx/plugins/DollFrame/
+│   ├── DollFrame.dll
+│   ├── dollframe_shaders.bundle
+│   ├── Characters/                      # Or DollFrame_Characters/ (also scanned in sibling plugin folders)
+│   │   └── <CharacterName>/
+│   │       ├── <model>.pmx              # PMX 2.0 model
+│   │       ├── sdf_face.png             # Optional baked facial SDF map
+│   │       └── Textures/                # Model textures
+│   └── Voices/                          # Or DollFrame_Voices/ (also scanned in sibling plugin folders)
+│       └── <CharacterFamily>/
+│           ├── OnFight/*.wav            # 16-bit PCM or 32-bit float .wav
+│           ├── NeedMedkit/*.wav
+│           └── ...                      # Named after EFT EPhraseTrigger or USEC/BEAR bank aliases
+└── user/mods/DollFrame/
+    └── DollFrame.Server.dll             # Optional server metadata companion
+```
+
+### `Characters` Skeleton Naming Rules (PMX / MMD)
+
+DollFrame maps standard Japanese MMD bone names (`BoneContract`) to the EFT skeleton. All **21 core bones** below are required for a character to attach cleanly:
+
+| Region | Required Bone Names (PMX Japanese) |
+|---|---|
+| **Pelvis / Spine / Head** | `下半身`, `上半身`, `上半身2`, `首`, `頭` *(optional root aliases: `腰`, `センター`)* |
+| **Left Arm** | `左肩`, `左腕`, `左ひじ`, `左手首` |
+| **Right Arm** | `右肩`, `右腕`, `右ひじ`, `右手首` |
+| **Left Leg** | `左足`, `左ひざ`, `左足首`, `左足首先` |
+| **Right Leg** | `右足`, `右ひざ`, `右足首`, `右足首先` |
+
+- **Optional 30 Finger Bones** (for weapon grip snapping & relaxed open-hand poses):
+  - Thumb: `左親指０` / `１` / `２`, `右親指０` / `１` / `２`
+  - Index: `左人指１` / `２` / `３`, `右人指１` / `２` / `３`
+  - Middle: `左中指１` / `２` / `３`, `右中指１` / `２` / `３`
+  - Ring: `左薬指１` / `２` / `３`, `右薬指１` / `２` / `３`
+  - Pinky: `左小指１` / `２` / `３`, `右小指１` / `２` / `３`
+- **Secondary Physics & Extra Bones**: Any unlisted descendant bones (hair, skirt, ribbon, coat, bust) remain parented to their authored bone and are automatically driven by `SpringPhysics`.
+
+### `Voices` Naming & Matching Rules
+
+- **Folder Mapping**: Exact character folder name is checked first (`Voices/<CharacterName>/`), followed by **longest-prefix matching** (e.g. `GF2-克萊妲(濯浪焦點)` automatically resolves to `Voices/GF2-克萊妲/`).
+- **Trigger Subfolders**: Name subfolders after EFT `EPhraseTrigger` values (e.g. `OnFight`, `OnBeingHurt`, `NeedMedkit`, `OnEnemyDown`, `GetInCover`, `Reload`, `Greetings`) or standard USEC/BEAR bank aliases (`Fight`, `BrokenHand`, `BrokenLeg`, `Cooperation`, `Attention`, etc.).
+
 ---
 
 ## Configuration
@@ -130,6 +176,12 @@ Config file: `BepInEx/config/DollFrame.cfg` (editable in-game via **F12**).
 | `Hide earpiece on replaced bodies` | `true` | Hide PMC headsets/earpieces. |
 | `Hide armband on replaced bodies` | `true` | Hide PMC armbands. |
 
+### Multiplayer (Fika)
+
+| Key | Default | Description |
+|---|---|---|
+| `Sync teammate models and voices` | `true` | Sync and display teammates' selected DollFrame models and voices in Fika co-op raids (requires matching packs installed locally). |
+
 ---
 
 ## Character Packages
@@ -156,7 +208,10 @@ Config file: `BepInEx/config/DollFrame.cfg` (editable in-game via **F12**).
 ## Architecture
 
 ```text
-Plugin.cs                      # BepInEx entry point, 26 config bindings, folder scanner, Harmony patches
+Plugin.cs                      # BepInEx entry point, 27 config bindings, folder scanner, Harmony patches
+├── Multiplayer/
+│   ├── MultiplayerRegistry.cs # Network-agnostic ProfileId -> CharacterName registry & player lookup
+│   └── FikaBridge.cs          # Lazy-loaded Fika packet sync (DollFrameAppearancePacket) & host relay
 ├── Character/
 │   ├── PmxRuntime.cs          # PMX 2.0 parser, texture loader, PmxAssets LRU cache
 │   ├── MeshSplitter.cs        # Load-time body/head mesh splitting
@@ -198,6 +253,7 @@ dotnet build ServerMod/DollFrame.Server.csproj -c Release
 ## Roadmap
 
 - [x] **v0.4.0–0.4.1**: Hideout floor fall-through fix, full-module lifecycle/memory-leak hardening, `Dress`-skinned headgear hiding (`Headwear`/`Earpiece`/`FaceCover`), immediate weapon-switch visibility sync, `< 0.05 cm` wrist grip convergence, finger curl snapping, natural unarmed arm pose, voice RMS loudness normalization, and streamlined configuration.
+- [x] **v0.4.2–0.4.3**: Segment-to-capsule secondary physics & auto-fitted body capsules, plus Fika multiplayer model & multi-family voice synchronization.
 - [ ] **Future**: In-game per-character voice volume/pitch presets, expanded trigger bank aliases, and additional stylized shader presets.
 
 ---

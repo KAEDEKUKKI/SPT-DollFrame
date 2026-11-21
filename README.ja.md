@@ -22,7 +22,7 @@
 ## バッジ
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-0.4.1-7c4dff?style=for-the-badge" alt="Version 0.4.1" />
+  <img src="https://img.shields.io/badge/Version-0.4.3-7c4dff?style=for-the-badge" alt="Version 0.4.3" />
   <img src="https://img.shields.io/badge/Single%20Player%20Tushonka-~4.1.6-blue?style=for-the-badge" alt="Single Player Tushonka ~4.1.6" />
   <img src="https://img.shields.io/badge/Platform-BepInEx%205%20%7C%20.NET%20Standard%202.1-success?style=for-the-badge" alt="Platform" />
   <img src="https://img.shields.io/badge/License-All%20Rights%20Reserved-lightgrey?style=for-the-badge" alt="License" />
@@ -83,6 +83,52 @@
 
 3. ゲームを起動し、メインメニューの **Character → Overall** 画面にある `DollFrame` 行からキャラクターを選択します。レイド／ハイドアウトでモデルを適用する場合は、**F12** の設定画面から `Visual → Replace player body` を有効にしてください。
 
+### ディレクトリ構成
+
+```text
+<SPTarkov>/
+├── BepInEx/plugins/DollFrame/
+│   ├── DollFrame.dll
+│   ├── dollframe_shaders.bundle
+│   ├── Characters/                      # または DollFrame_Characters/（他プラグイン配下も自動走査）
+│   │   └── <キャラクター名>/
+│   │       ├── <model>.pmx              # PMX 2.0 モデル
+│   │       ├── sdf_face.png             # 任意の顔用 SDF ベイクテクスチャ
+│   │       └── Textures/                # テクスチャ群
+│   └── Voices/                          # または DollFrame_Voices/（他プラグイン配下も自動走査）
+│       └── <ファミリー名>/
+│           ├── OnFight/*.wav            # 16-bit PCM または 32-bit float .wav
+│           ├── NeedMedkit/*.wav
+│           └── ...                      # EFT の EPhraseTrigger または USEC/BEAR バンク別名
+└── user/mods/DollFrame/
+    └── DollFrame.Server.dll             # 任意のサーバー情報表示コンパニオン
+```
+
+### `Characters` ボーン命名規則（PMX / MMD）
+
+DollFrame は標準的な日本語 MMD ボーン名（`BoneContract`）を EFT スケルトンへ対応付けます。以下の **21 本の必須ボーン**が揃っている必要があります：
+
+| 部位 | 必須ボーン名（PMX 日本語標準名） |
+|---|---|
+| **下半身／脊椎／頭部** | `下半身`, `上半身`, `上半身2`, `首`, `頭` *（任意のルート別名：`腰`, `センター`）* |
+| **左腕** | `左肩`, `左腕`, `左ひじ`, `左手首` |
+| **右腕** | `右肩`, `右腕`, `右ひじ`, `右手首` |
+| **左脚** | `左足`, `左ひざ`, `左足首`, `左足首先` |
+| **右脚** | `右足`, `右ひざ`, `右足首`, `右足首先` |
+
+- **任意の 30 本の指ボーン**（武器グリップへのスナップ＆非武装時の自然な開き用）：
+  - 親指：`左親指０` / `１` / `２`、`右親指０` / `１` / `２`
+  - 人差指：`左人指１` / `２` / `３`、`右人指１` / `２` / `３`
+  - 中指：`左中指１` / `２` / `３`、`右中指１` / `２` / `３`
+  - 薬指：`左薬指１` / `２` / `３`、`右薬指１` / `２` / `３`
+  - 小指：`左小指１` / `２` / `３`、`右小指１` / `２` / `３`
+- **揺れ物物理＆その他ボーン**：上記契約に含まれない末端ボーン（髪・スカート・リボン・上着・胸など）は元の親子階層を保持したまま `SpringPhysics` により自動制御されます。
+
+### `Voices` 命名・マッチング規則
+
+- **フォルダ対応付け**：キャラクターフォルダ名と完全一致する `Voices/<キャラクター名>/` を優先し、一致しない場合は**最長前方一致**で探索します（例：`GF2-克萊妲(濯浪焦點)` は `Voices/GF2-克萊妲/` へ自動対応）。
+- **トリガーサブフォルダ**：EFT の `EPhraseTrigger` 名（`OnFight`、`OnBeingHurt`、`NeedMedkit`、`OnEnemyDown`、`GetInCover`、`Reload`、`Greetings` など）または USEC/BEAR バンク別名（`Fight`、`BrokenHand`、`BrokenLeg`、`Cooperation`、`Attention` など）でフォルダを作成してください。
+
 ---
 
 ## 設定項目とデフォルト値
@@ -130,6 +176,12 @@
 | `Hide earpiece on replaced bodies` | `true` | ヘッドセット／イヤーピースを非表示にします。 |
 | `Hide armband on replaced bodies` | `true` | アームバンドを非表示にします。 |
 
+### Multiplayer（Fika マルチプレイ）
+
+| キー | 初期値 | 説明 |
+|---|---|---|
+| `Sync teammate models and voices` | `true` | Fika マルチプレイで味方が選択した DollFrame モデルとボイスを同期・表示します（ローカル側にも対象パックの導入が必要です）。 |
+
 ---
 
 ## キャラクターパッケージ構成
@@ -156,7 +208,10 @@
 ## アーキテクチャ
 
 ```text
-Plugin.cs                      # BepInEx エントリ、26項目の設定、フォルダ走査、Harmony 登録
+Plugin.cs                      # BepInEx エントリ、27項目の設定、フォルダ走査、Harmony 登録
+├── Multiplayer/
+│   ├── MultiplayerRegistry.cs # ネットワーク非依存の ProfileId → CharacterName 登録・プレイヤー検索
+│   └── FikaBridge.cs          # 遅延ロード Fika パケット同期（DollFrameAppearancePacket）＆ホスト中継
 ├── Character/
 │   ├── PmxRuntime.cs          # PMX 2.0 パーサー、テクスチャ読込、PmxAssets LRU キャッシュ
 │   ├── MeshSplitter.cs        # 読込時の頭部／胴体メッシュ分割
@@ -198,6 +253,7 @@ dotnet build ServerMod/DollFrame.Server.csproj -c Release
 ## ロードマップ
 
 - [x] **v0.4.0–0.4.1**：ハイドアウト床すり抜け修正、全モジュールライフサイクル／メモリリーク対策、ヘルメット／ヘッドセット／マスク非表示修正、武器切替時の一時非表示バグ修正、`< 0.05 cm` 握り精度＆指先スナップ、非武装時腕ポーズの自然化、ボイス RMS 音量正規化＆設定項目の整理。
+- [x] **v0.4.2–0.4.3**：線分対カプセル揺れ物衝突＆体格自動フィッティング、Fika マルチプレイにおける味方モデル・マルチファミリーボイス同期アーキテクチャ。
 - [ ] **今後の予定**：キャラクター別の個別ボイス音量／ピッチプリセット、フレーズトリガー別名の拡充、追加のスタイルシェーダープリセット。
 
 ---

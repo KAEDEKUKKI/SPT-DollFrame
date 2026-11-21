@@ -50,9 +50,12 @@ namespace DollFrame
                 { "OnSwitchToMeleeWeapon", new[] { "KnifesOnly", "KnifeKill" } },
             };
 
-        private static string _cachedFamily;
-        private static Dictionary<string, AudioClip[]> _cachedClips;
-        private static string _lastMissingWarnFamily;
+        private static readonly Dictionary<string, Dictionary<string, AudioClip[]>> FamilyClipCache =
+            new Dictionary<string, Dictionary<string, AudioClip[]>>(StringComparer.Ordinal);
+        private static readonly ConditionalWeakTable<BaseSpeaker, string> AppliedFamilyBySpeaker =
+            new ConditionalWeakTable<BaseSpeaker, string>();
+        private static readonly HashSet<string> MissingWarnedFamilies =
+            new HashSet<string>(StringComparer.Ordinal);
 
         [HarmonyPostfix]
         [HarmonyPatch(typeof(BaseSpeaker), nameof(BaseSpeaker.Init))]
@@ -70,24 +73,13 @@ namespace DollFrame
 
         private static void ApplyToSpeaker(BaseSpeaker speaker, string caller)
         {
-            if (speaker == null || !Plugin.ReplaceBody.Value || !Plugin.ReplaceVoice.Value) return;
-            if (VanillaSelection.IsVanilla(Plugin.Character?.Value)) return;
+            if (speaker == null || !Plugin.ReplaceVoice.Value) return;
             try
             {
-                var main = GamePlayerOwner.MyPlayer;
-                if (main != null)
+                var player = Multiplayer.MultiplayerRegistry.FindPlayerBySpeaker(speaker);
+                if (player != null)
                 {
-                    if (main.IsYourPlayer && main.Speaker == speaker)
-                        Apply(main);
-                    return;
-                }
-                foreach (var p in UnityEngine.Object.FindObjectsOfType<Player>())
-                {
-                    if (p != null && p.IsYourPlayer && p.Speaker == speaker)
-                    {
-                        Apply(p);
-                        return;
-                    }
+                    Apply(player);
                 }
             }
             catch (Exception e)
@@ -98,9 +90,15 @@ namespace DollFrame
 
         internal static void Apply(Player player)
         {
-            if (player == null || !player.IsYourPlayer) return;
-            if (!Plugin.ReplaceBody.Value || !Plugin.ReplaceVoice.Value) return;
-            if (VanillaSelection.IsVanilla(Plugin.Character?.Value))
+            if (player == null) return;
+            if (!Plugin.ReplaceVoice.Value)
+            {
+                Restore(player);
+                return;
+            }
+
+            var targetChar = Multiplayer.MultiplayerRegistry.ResolveCharacterForPlayer(player);
+            if (string.IsNullOrEmpty(targetChar))
             {
                 Restore(player);
                 return;
@@ -109,23 +107,22 @@ namespace DollFrame
             var speaker = player.Speaker;
             if (speaker == null || speaker.PhrasesBanks == null || speaker.PhrasesBanks.Count == 0) return;
 
-            var pkgName = Path.GetFileName(Plugin.Character?.Value);
-            var voiceDir = ResolveVoiceDir(pkgName);
+            var voiceDir = ResolveVoiceDir(targetChar);
             if (voiceDir == null)
             {
                 Restore(player);
-                if (!string.IsNullOrEmpty(pkgName) && _lastMissingWarnFamily != pkgName)
-                {
-                    _lastMissingWarnFamily = pkgName;
-                    Plugin.Log.LogInfo($"[DollFrame] voice: no Voices pack for '{pkgName}', keeping vanilla voice");
-                }
+                if (MissingWarnedFamilies.Add(targetChar))
+                    Plugin.Log.LogInfo($"[DollFrame] voice: no Voices pack for '{targetChar}', keeping vanilla voice");
                 return;
             }
 
             var family = Path.GetFileNameWithoutExtension(voiceDir);
-            // 先還原並卸載當前說話者，避免 ClearCache 銷毀舊 AudioClip 後新包缺 bank 造成 Use-After-Free
-            if (!string.Equals(_cachedFamily, family, StringComparison.Ordinal))
-                Restore(player);
+            if (AppliedFamilyBySpeaker.TryGetValue(speaker, out var currentFamily) &&
+                string.Equals(currentFamily, family, StringComparison.Ordinal))
+            {
+                return;
+            }
+
             var bankMap = GetOrLoadFamilyClips(family, voiceDir);
             if (bankMap == null || bankMap.Count == 0)
             {
@@ -135,6 +132,8 @@ namespace DollFrame
 
             SnapshotOriginals(speaker);
             _activeSpeakers.Add(speaker);
+            AppliedFamilyBySpeaker.Remove(speaker);
+            AppliedFamilyBySpeaker.Add(speaker, family);
 
             int replacedBanks = 0;
             int replacedClips = 0;
@@ -165,7 +164,7 @@ namespace DollFrame
             }
 
             string unmatchedInfo = unmatched != null ? $" (unmatched={unmatched.Count}: {string.Join(",", unmatched)})" : string.Empty;
-            Plugin.Log.LogInfo($"[DollFrame] voice: applied '{family}' ({replacedBanks} banks, {replacedClips} clip slots){unmatchedInfo}");
+            Plugin.Log.LogInfo($"[DollFrame] voice: applied '{family}' to '{player.Profile?.Nickname}' ({replacedBanks} banks, {replacedClips} clip slots){unmatchedInfo}");
         }
 
         private static AudioClip[] ResolveBankClips(Dictionary<string, AudioClip[]> bankMap, EPhraseTrigger trigger, TagBank bank)
@@ -193,6 +192,7 @@ namespace DollFrame
             if (player == null || player.Speaker == null) return;
             var speaker = player.Speaker;
             _activeSpeakers.Remove(speaker);
+            AppliedFamilyBySpeaker.Remove(speaker);
             if (!OriginalSnapshots.TryGetValue(speaker, out var snap) || snap == null) return;
 
             int restored = 0;
@@ -295,14 +295,12 @@ namespace DollFrame
 
         private static Dictionary<string, AudioClip[]> GetOrLoadFamilyClips(string family, string voiceSource)
         {
-            if (string.Equals(_cachedFamily, family, StringComparison.Ordinal) && _cachedClips != null)
-                return _cachedClips;
+            if (FamilyClipCache.TryGetValue(family, out var cached) && cached != null)
+                return cached;
 
-            ClearCache();
             var map = LoadDirectory(family, voiceSource);
-
-            _cachedFamily = family;
-            _cachedClips = map;
+            if (map != null && map.Count > 0)
+                FamilyClipCache[family] = map;
             return map;
         }
 
@@ -335,19 +333,23 @@ namespace DollFrame
 
         private static void ClearCache()
         {
-            if (_cachedClips != null)
+            if (FamilyClipCache.Count > 0)
             {
                 var destroyed = new HashSet<AudioClip>();
-                foreach (var kv in _cachedClips)
+                foreach (var familyMap in FamilyClipCache.Values)
                 {
-                    if (kv.Value == null) continue;
-                    foreach (var c in kv.Value)
-                        if (c != null && destroyed.Add(c)) UnityEngine.Object.Destroy(c);
+                    if (familyMap == null) continue;
+                    foreach (var kv in familyMap)
+                    {
+                        if (kv.Value == null) continue;
+                        foreach (var c in kv.Value)
+                            if (c != null && destroyed.Add(c)) UnityEngine.Object.Destroy(c);
+                    }
+                    familyMap.Clear();
                 }
-                _cachedClips.Clear();
+                FamilyClipCache.Clear();
             }
-            _cachedFamily = null;
-            _cachedClips = null;
+            MissingWarnedFamilies.Clear();
         }
 
         private static AudioClip LoadWavBytes(byte[] bytes, string clipName)
